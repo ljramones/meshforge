@@ -21,6 +21,9 @@ public final class MeshLoaders {
     public static MeshLoaders defaults() {
         Builder builder = builder();
         builder.register("obj", MeshLoaderFactory.obj());
+        builder.register("stl", MeshLoaderFactory.stl());
+        builder.register("ply", MeshLoaderFactory.ply());
+        builder.register("off", MeshLoaderFactory.off());
         return builder.build();
     }
 

@@ -28,14 +28,14 @@ class MeshLoadersTest {
     @Test
     void plannedRegistryHasExplicitPlaceholderForKnownButUnimplementedFormat() {
         MeshLoaders loaders = MeshLoaders.planned();
-        IOException ex = assertThrows(IOException.class, () -> loaders.load(Path.of("mesh.stl")));
+        IOException ex = assertThrows(IOException.class, () -> loaders.load(Path.of("mesh.usd")));
         assertTrue(ex.getMessage().contains("not implemented yet"));
     }
 
     @Test
     void defaultsStillRejectUnknownFormats() {
         MeshLoaders loaders = MeshLoaders.defaults();
-        IOException ex = assertThrows(IOException.class, () -> loaders.load(Path.of("mesh.stl")));
+        IOException ex = assertThrows(IOException.class, () -> loaders.load(Path.of("mesh.xyz")));
         assertTrue(ex.getMessage().contains("Unsupported mesh format"));
     }
 }

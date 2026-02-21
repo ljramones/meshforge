@@ -17,11 +17,11 @@ public final class MeshLoaderFactory {
     }
 
     public static MeshFileLoader stl() {
-        return unsupported("stl");
+        return StlMeshLoader::load;
     }
 
     public static MeshFileLoader ply() {
-        return unsupported("ply");
+        return PlyMeshLoader::load;
     }
 
     public static MeshFileLoader gltf() {
@@ -41,7 +41,7 @@ public final class MeshLoaderFactory {
     }
 
     public static MeshFileLoader off() {
-        return unsupported("off");
+        return OffMeshLoader::load;
     }
 
     public static MeshFileLoader threemf() {
