@@ -258,14 +258,14 @@ Reliable forked runner script (uses direct `java -cp ...` and works outside sand
 JMH_FILTER='.*MeshPackerBenchmark.*' JMH_FORKS=2 ./scripts/run-jmh.sh
 ```
 
-Results (`ms/op`, JMH `avgt`, non-forked `-f 0`):
+Results (JMH `avgt`, non-forked `-f 0`):
 
-| Benchmark | Score | Error |
-|---|---:|---:|
-| `MeshPackerBenchmark.packDebug` | 5.679 | ±0.475 |
-| `MeshPackerBenchmark.packRealtime` | 5.562 | ±0.236 |
-| `MeshPipelineBenchmark.realtimePipeline` | 305.447 | ±18.161 |
-| `OptimizeVertexCacheBenchmark.optimizeAndMeasureAcmr` | 850.174 | ±110.213 |
+| Benchmark | Units | Score | Error | Cnt |
+|---|---|---:|---:|---:|
+| `MeshPackerBenchmark.packDebug` | `ms/op` | 5.679 | ±0.475 | 5 |
+| `MeshPackerBenchmark.packRealtime` | `ms/op` | 5.562 | ±0.236 | 5 |
+| `MeshPipelineBenchmark.realtimePipeline` | `ms/op` | 305.447 | ±18.161 | 5 |
+| `OptimizeVertexCacheBenchmark.optimizeAndMeasureAcmr` | `ms/op` | 850.174 | ±110.213 | 5 |
 
 Notes:
 - Default benchmark profile uses in-process mode (`-f 0`) for sandbox compatibility.
