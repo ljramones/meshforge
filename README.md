@@ -232,8 +232,31 @@ mvn clean test                          # build and test all modules
 mvn -pl meshforge clean test            # build/test core mesh module only
 mvn -pl meshforge-loader clean test     # build/test loader module
 mvn -pl meshforge-demo package          # build demo module
-mvn -pl meshforge -Pbench exec:exec     # run JMH benchmarks for meshforge module
+mvn -pl meshforge -Pbench test-compile exec:java   # run JMH benchmarks for meshforge module
 ```
+
+---
+
+# Benchmark Snapshot
+
+Command run on February 21, 2026:
+
+```bash
+mvn -pl meshforge -Pbench test-compile exec:java -Djmh.filter='.*(OptimizeVertexCacheBenchmark|MeshPackerBenchmark|MeshPipelineBenchmark).*'
+```
+
+Results (`ms/op`, JMH `avgt`, non-forked `-f 0`):
+
+| Benchmark | Score | Error |
+|---|---:|---:|
+| `MeshPackerBenchmark.packDebug` | 5.679 | ±0.475 |
+| `MeshPackerBenchmark.packRealtime` | 5.562 | ±0.236 |
+| `MeshPipelineBenchmark.realtimePipeline` | 305.447 | ±18.161 |
+| `OptimizeVertexCacheBenchmark.optimizeAndMeasureAcmr` | 850.174 | ±110.213 |
+
+Notes:
+- Benchmarks run in-process in this environment (`-f 0`) to avoid sandbox socket restrictions.
+- Use forked runs on a dedicated machine for publishable/perf-regression baselines.
 
 ---
 
@@ -245,4 +268,3 @@ mvn -pl meshforge -Pbench exec:exec     # run JMH benchmarks for meshforge modul
 * Basic compression policies
 * Immutable runtime mesh
 * glTF IO module (initial support)
-
