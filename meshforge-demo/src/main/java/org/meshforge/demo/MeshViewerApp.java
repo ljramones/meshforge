@@ -10,6 +10,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ToolBar;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.PhongMaterial;
@@ -34,6 +35,9 @@ import java.util.List;
 public final class MeshViewerApp extends Application {
     private static final String[] SUPPORTED_EXT = new String[] {"*.obj", "*.stl", "*.ply", "*.off"};
     private static final double TARGET_RADIUS = 2.0;
+    private static final double DEFAULT_CAMERA_Z = -8.0;
+    private static final double MIN_CAMERA_Z = -0.8;
+    private static final double MAX_CAMERA_Z = -300.0;
 
     private final Group world = new Group();
     private final Rotate rotX = new Rotate(-25, Rotate.X_AXIS);
@@ -76,7 +80,7 @@ public final class MeshViewerApp extends Application {
         camera = new PerspectiveCamera(true);
         camera.setNearClip(0.01);
         camera.setFarClip(10_000.0);
-        camera.setTranslateZ(-8.0);
+        camera.setTranslateZ(DEFAULT_CAMERA_Z);
         sub.setCamera(camera);
 
         sub.widthProperty().addListener((obs, oldV, newV) -> {});
@@ -92,8 +96,22 @@ public final class MeshViewerApp extends Application {
         sub.addEventHandler(MouseEvent.MOUSE_DRAGGED, e -> {
             double dx = e.getSceneX() - dragStartX;
             double dy = e.getSceneY() - dragStartY;
-            rotY.setAngle(startRotY + dx * 0.35);
-            rotX.setAngle(startRotX - dy * 0.35);
+            if (e.isPrimaryButtonDown()) {
+                rotY.setAngle(startRotY + dx * 0.35);
+                rotX.setAngle(startRotX - dy * 0.35);
+            } else if (e.isSecondaryButtonDown()) {
+                double panScale = Math.max(0.001, -camera.getTranslateZ() * 0.0012);
+                world.setTranslateX(world.getTranslateX() + dx * panScale);
+                world.setTranslateY(world.getTranslateY() + dy * panScale);
+                dragStartX = e.getSceneX();
+                dragStartY = e.getSceneY();
+            }
+        });
+
+        sub.addEventHandler(ScrollEvent.SCROLL, e -> {
+            double zoomFactor = Math.exp(e.getDeltaY() * 0.0015);
+            double nextZ = camera.getTranslateZ() / zoomFactor;
+            camera.setTranslateZ(clamp(nextZ, MAX_CAMERA_Z, MIN_CAMERA_Z));
         });
 
         return sub;
@@ -164,11 +182,17 @@ public final class MeshViewerApp extends Application {
         view.setTranslateX(-cx * scale);
         view.setTranslateY(-cy * scale);
         view.setTranslateZ(-cz * scale);
+        world.setTranslateX(0.0);
+        world.setTranslateY(0.0);
 
         if (camera != null) {
-            camera.setTranslateZ(-8.0);
+            camera.setTranslateZ(DEFAULT_CAMERA_Z);
             camera.setNearClip(0.01);
             camera.setFarClip(100_000.0);
         }
+    }
+
+    private static double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 }
