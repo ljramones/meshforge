@@ -5,13 +5,13 @@ Authoring `MeshData` -> Ops -> `PackedMesh` suitable for real-time rendering.
 
 ## Milestone 1: Authoring Core (MeshData)
 ### Tasks
-- [ ] `VertexSchema` (immutable, deterministic order)
-- [ ] `AttributeKey` (semantic + setIndex)
-- [ ] `VertexFormat` (minimal v1 set)
-- [ ] `VertexAttributeView` + primitive-array backed storage
-- [ ] `MeshData` (SoA-by-attribute, `int[]` indices, submeshes)
-- [ ] `MeshBuilder` (small procedural)
-- [ ] `MeshWriter` (bulk)
+- [x] `VertexSchema` (immutable, deterministic order)
+- [x] `AttributeKey` (semantic + setIndex)
+- [x] `VertexFormat` (minimal v1 set)
+- [x] `VertexAttributeView` + primitive-array backed storage
+- [x] `MeshData` (SoA-by-attribute, `int[]` indices, submeshes)
+- [x] `MeshBuilder` (small procedural)
+- [x] `MeshWriter` (bulk)
 
 ### Acceptance
 - Can build a triangle and cube with position + indices
@@ -20,11 +20,11 @@ Authoring `MeshData` -> Ops -> `PackedMesh` suitable for real-time rendering.
 
 ## Milestone 2: Ops Pipeline
 ### Tasks
-- [ ] `MeshOp` interface + `MeshPipeline.run(...)`
-- [ ] `ValidateOp` (indices range, submesh range)
-- [ ] `ComputeBoundsOp` (Vectrix AABB)
-- [ ] `RecalculateNormalsOp` (smooth)
-- [ ] `RecalculateTangentsOp` (basic, `w` handedness)
+- [x] `MeshOp` interface + `MeshPipeline.run(...)`
+- [x] `ValidateOp` (indices range, submesh range)
+- [x] `ComputeBoundsOp` (Vectrix-compatible bounds model)
+- [x] `RecalculateNormalsOp` (smooth)
+- [x] `RecalculateTangentsOp` (basic, `w` handedness)
 
 ### Acceptance
 - Bounds computed correctly for cube fixtures
@@ -33,11 +33,11 @@ Authoring `MeshData` -> Ops -> `PackedMesh` suitable for real-time rendering.
 
 ## Milestone 3: First Renderer-Ready Pack
 ### Tasks
-- [ ] `PackSpec.debug()` (`F32` everything)
-- [ ] `PackSpec.realtime()` (compressed normal/tangent, half uv)
-- [ ] `VertexLayout` (stride + offsets)
-- [ ] `PackedMesh` (immutable runtime shape)
-- [ ] `MeshPacker.pack(...)` interleaved output
+- [x] `PackSpec.debug()` (`F32` everything)
+- [x] `PackSpec.realtime()` (compressed normal/tangent, half uv)
+- [x] `VertexLayout` (stride + offsets)
+- [x] `PackedMesh` (immutable runtime shape)
+- [x] `MeshPacker.pack(...)` interleaved output
 
 ### Acceptance
 - Packed stride/offsets match expected layout
@@ -47,10 +47,10 @@ Authoring `MeshData` -> Ops -> `PackedMesh` suitable for real-time rendering.
 
 ## Milestone 4: Throughput and Size
 ### Tasks
-- [ ] `WeldVerticesOp` (epsilon, remap)
-- [ ] `CompactVerticesOp`
-- [ ] `OptimizeVertexCacheOp` (Forsyth)
-- [ ] Full realtime compression defaults enabled
+- [x] `WeldVerticesOp` (epsilon, remap)
+- [x] `CompactVerticesOp`
+- [x] `OptimizeVertexCacheOp` (Forsyth)
+- [x] Full realtime compression defaults enabled
 
 ### Acceptance
 - ACMR improves on medium mesh benchmark fixture
