@@ -2,11 +2,15 @@ package org.meshforge.demo;
 
 import org.meshforge.api.Ops;
 import org.meshforge.api.Packers;
+import org.meshforge.core.attr.AttributeSemantic;
 import org.meshforge.loader.MeshLoaders;
+import org.meshforge.ops.pipeline.MeshOp;
 import org.meshforge.ops.pipeline.MeshPipeline;
 import org.meshforge.pack.packer.MeshPacker;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class MeshForgeDemo {
     private MeshForgeDemo() {
@@ -19,15 +23,17 @@ public final class MeshForgeDemo {
         }
 
         var mesh = MeshLoaders.defaults().load(Path.of(args[0]));
-        mesh = MeshPipeline.run(mesh,
-            Ops.validate(),
-            Ops.removeDegenerates(),
-            Ops.weld(1.0e-6f),
-            Ops.normals(60f),
-            Ops.tangents(),
-            Ops.optimizeVertexCache(),
-            Ops.bounds()
-        );
+        List<MeshOp> ops = new ArrayList<>();
+        ops.add(Ops.validate());
+        ops.add(Ops.removeDegenerates());
+        ops.add(Ops.weld(1.0e-6f));
+        ops.add(Ops.normals(60f));
+        if (mesh.has(AttributeSemantic.UV, 0)) {
+            ops.add(Ops.tangents());
+        }
+        ops.add(Ops.optimizeVertexCache());
+        ops.add(Ops.bounds());
+        mesh = MeshPipeline.run(mesh, ops.toArray(MeshOp[]::new));
 
         var packed = MeshPacker.pack(mesh, Packers.realtime());
         System.out.println("Vertices: " + mesh.vertexCount());
