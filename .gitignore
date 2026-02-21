@@ -1,0 +1,27 @@
+# Maven / Java build output
+/target/
+
+# IDE settings (IntelliJ)
+/.idea/
+*.iml
+
+# IDE settings (VS Code)
+/.vscode/
+
+# IDE settings (Eclipse)
+.project
+.classpath
+.settings/
+
+# macOS metadata
+.DS_Store
+
+# Logs
+*.log
+
+# JVM crash logs
+hs_err_pid*
+replay_pid*
+
+# Optional local tooling caches
+/.mvn/timing.properties
