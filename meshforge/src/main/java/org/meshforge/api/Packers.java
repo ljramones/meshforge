@@ -14,6 +14,10 @@ public final class Packers {
         return PackSpec.realtime();
     }
 
+    public static PackSpec realtimeFast() {
+        return PackSpec.realtimeFast();
+    }
+
     public static PackSpec debug() {
         return PackSpec.debug();
     }

@@ -149,6 +149,14 @@ mesh = MeshPipeline.run(mesh,
 PackedMesh packed = MeshPacker.pack(mesh, Packers.realtime());
 ```
 
+Preset shortcuts:
+
+```java
+mesh = Pipelines.realtime(mesh);      // full import-time optimization path
+mesh = Pipelines.realtimeFast(mesh);  // fast path for already-clean assets
+PackedMesh packed = MeshPacker.pack(mesh, Packers.realtimeFast());
+```
+
 ---
 
 # Package Layout
@@ -276,6 +284,10 @@ How to read the table:
 - `Score`: average runtime per operation across measured iterations.
 - `Error`: JMH confidence interval half-width (99.9%) for the score.
 - `Cnt`: number of measurement iterations used for the final score.
+
+Interpretation tip:
+- `MeshPipelineBenchmark.realtimePipeline` is an import/preprocess cost, not per-frame render cost.
+- Use `Pipelines.realtimeFast(...)` when source meshes are already clean and you want lower import latency.
 
 ---
 

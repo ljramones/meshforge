@@ -20,17 +20,12 @@ import javafx.scene.shape.MeshView;
 import javafx.scene.transform.Rotate;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
-import org.meshforge.api.Ops;
 import org.meshforge.api.Packers;
-import org.meshforge.core.attr.AttributeSemantic;
+import org.meshforge.api.Pipelines;
 import org.meshforge.loader.MeshLoaders;
-import org.meshforge.ops.pipeline.MeshOp;
-import org.meshforge.ops.pipeline.MeshPipeline;
 import org.meshforge.pack.packer.MeshPacker;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
 
 public final class MeshViewerApp extends Application {
     private static final String[] SUPPORTED_EXT = new String[] {"*.obj", "*.stl", "*.ply", "*.off"};
@@ -131,17 +126,7 @@ public final class MeshViewerApp extends Application {
 
         try {
             var mesh = MeshLoaders.defaults().load(file.toPath());
-            List<MeshOp> ops = new ArrayList<>();
-            ops.add(Ops.validate());
-            ops.add(Ops.removeDegenerates());
-            ops.add(Ops.weld(1.0e-6f));
-            ops.add(Ops.normals(60f));
-            if (mesh.has(AttributeSemantic.UV, 0)) {
-                ops.add(Ops.tangents());
-            }
-            ops.add(Ops.optimizeVertexCache());
-            ops.add(Ops.bounds());
-            mesh = MeshPipeline.run(mesh, ops.toArray(MeshOp[]::new));
+            mesh = Pipelines.realtimeFast(mesh);
 
             // Ensure pack path remains usable from UI flow.
             MeshPacker.pack(mesh, Packers.realtime());

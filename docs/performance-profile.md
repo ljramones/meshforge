@@ -121,3 +121,17 @@ Current benchmark classes:
 - `org.meshforge.bench.OptimizeVertexCacheBenchmark`
 - `org.meshforge.bench.MeshPackerBenchmark`
 - `org.meshforge.bench.MeshPipelineBenchmark`
+- `org.meshforge.bench.MeshOpsBenchmark`
+- `org.meshforge.bench.MeshSizeScalingBenchmark`
+
+Per-op hotspot pass:
+
+```bash
+mvn -pl meshforge -Pbench test-compile exec:java -Djmh.filter='.*MeshOpsBenchmark.*'
+```
+
+Size scaling matrix (`cells` = 64, 128, 256):
+
+```bash
+mvn -pl meshforge -Pbench test-compile exec:java -Djmh.filter='.*MeshSizeScalingBenchmark.*'
+```

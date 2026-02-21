@@ -46,6 +46,23 @@ final class BenchmarkFixtures {
         return mesh;
     }
 
+    static MeshData createPositionGridWithDegenerates(int cellsX, int cellsY, int everyNthTriangle) {
+        MeshData mesh = createPositionGrid(cellsX, cellsY);
+        int[] indices = mesh.indicesOrNull();
+        if (indices == null || everyNthTriangle <= 0) {
+            return mesh;
+        }
+        int triCount = indices.length / 3;
+        for (int t = 0; t < triCount; t++) {
+            if (t % everyNthTriangle == 0) {
+                int base = t * 3;
+                indices[base + 2] = indices[base];
+            }
+        }
+        mesh.setIndices(indices);
+        return mesh;
+    }
+
     static MeshData createRichGrid(int cellsX, int cellsY) {
         VertexSchema schema = VertexSchema.builder()
             .add(AttributeSemantic.POSITION, 0, VertexFormat.F32x3)
@@ -180,4 +197,3 @@ final class BenchmarkFixtures {
         }
     }
 }
-

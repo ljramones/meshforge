@@ -44,6 +44,7 @@ Planned op categories:
 Front-door classes keep common workflows simple:
 - `Meshes`: creation helpers
 - `Ops`: operation factories/pipeline helpers
+- `Pipelines`: preset processing flows (`realtime`, `realtimeFast`)
 - `Packers`: packing presets/helpers
 
 ## Intended Usage Flow
@@ -62,6 +63,13 @@ mesh = MeshPipeline.run(mesh,
 );
 
 PackedMesh packed = MeshPacker.pack(mesh, Packers.realtime());
+```
+
+Preset form:
+
+```java
+mesh = Pipelines.realtimeFast(mesh);
+PackedMesh packed = MeshPacker.pack(mesh, Packers.realtimeFast());
 ```
 
 ## Notes

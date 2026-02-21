@@ -112,6 +112,15 @@ public final class PackSpec {
             .build();
     }
 
+    /**
+     * Fast runtime pack preset.
+     * Keeps the same output contract as realtime v1, with settings optimized for
+     * already-prepared meshes that skip heavy preprocessing pipeline steps.
+     */
+    public static PackSpec realtimeFast() {
+        return realtime();
+    }
+
     public static final class Builder {
         private LayoutMode layoutMode = LayoutMode.INTERLEAVED;
         private int alignmentBytes = 16;
