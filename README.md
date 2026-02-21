@@ -245,6 +245,19 @@ Command run on February 21, 2026:
 mvn -pl meshforge -Pbench test-compile exec:java -Djmh.filter='.*(OptimizeVertexCacheBenchmark|MeshPackerBenchmark|MeshPipelineBenchmark).*'
 ```
 
+Forked run outside sandbox (recommended for trustworthy numbers):
+
+```bash
+mvn -pl meshforge -Pbench test-compile exec:java -Djmh.forks=1 -Djmh.filter='.*(OptimizeVertexCacheBenchmark|MeshPackerBenchmark|MeshPipelineBenchmark).*'
+```
+
+Reliable forked runner script (uses direct `java -cp ...` and works outside sandbox):
+
+```bash
+./scripts/run-jmh.sh
+JMH_FILTER='.*MeshPackerBenchmark.*' JMH_FORKS=2 ./scripts/run-jmh.sh
+```
+
 Results (`ms/op`, JMH `avgt`, non-forked `-f 0`):
 
 | Benchmark | Score | Error |
@@ -255,8 +268,14 @@ Results (`ms/op`, JMH `avgt`, non-forked `-f 0`):
 | `OptimizeVertexCacheBenchmark.optimizeAndMeasureAcmr` | 850.174 | ±110.213 |
 
 Notes:
-- Benchmarks run in-process in this environment (`-f 0`) to avoid sandbox socket restrictions.
-- Use forked runs on a dedicated machine for publishable/perf-regression baselines.
+- Default benchmark profile uses in-process mode (`-f 0`) for sandbox compatibility.
+- For publishable/perf-regression baselines, run outside sandbox with `-Djmh.forks=1` (or higher).
+
+How to read the table:
+- `Units`: `ms/op` means milliseconds per benchmark operation (lower is faster).
+- `Score`: average runtime per operation across measured iterations.
+- `Error`: JMH confidence interval half-width (99.9%) for the score.
+- `Cnt`: number of measurement iterations used for the final score.
 
 ---
 

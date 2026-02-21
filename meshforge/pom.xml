@@ -71,6 +71,7 @@
             <id>bench</id>
             <properties>
                 <jmh.filter>.*</jmh.filter>
+                <jmh.forks>0</jmh.forks>
             </properties>
             <build>
                 <plugins>
@@ -84,7 +85,7 @@
                             <arguments>
                                 <argument>${jmh.filter}</argument>
                                 <argument>-f</argument>
-                                <argument>0</argument>
+                                <argument>${jmh.forks}</argument>
                             </arguments>
                         </configuration>
                     </plugin>
