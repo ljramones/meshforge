@@ -8,6 +8,8 @@ This roadmap tracks planned features after the current v1 foundation.
 - Improve weld policy with configurable seam-safe keys (POSITION-only vs POSITION+UV+NORMAL).
 - Add richer packer validation (format coverage, bounds/metadata consistency).
 - Add lightweight OBJ/glTF import stubs to feed `MeshData` directly.
+- Expand `meshforge-loader` format registry by porting parser logic from `DynamisFX-Importers`
+  where feasible without JavaFX runtime coupling.
 
 ## v1.1 (engine-grade quality)
 - Upgrade `RecalculateTangentsOp` to MikkTSpace-compatible output.

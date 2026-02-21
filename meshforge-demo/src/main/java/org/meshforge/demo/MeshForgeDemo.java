@@ -2,7 +2,7 @@ package org.meshforge.demo;
 
 import org.meshforge.api.Ops;
 import org.meshforge.api.Packers;
-import org.meshforge.loader.ObjMeshLoader;
+import org.meshforge.loader.MeshLoaders;
 import org.meshforge.ops.pipeline.MeshPipeline;
 import org.meshforge.pack.packer.MeshPacker;
 
@@ -18,7 +18,7 @@ public final class MeshForgeDemo {
             return;
         }
 
-        var mesh = ObjMeshLoader.load(Path.of(args[0]));
+        var mesh = MeshLoaders.defaults().load(Path.of(args[0]));
         mesh = MeshPipeline.run(mesh,
             Ops.validate(),
             Ops.removeDegenerates(),
