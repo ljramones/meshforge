@@ -246,9 +246,3 @@ mvn -pl meshforge -Pbench exec:exec     # run JMH benchmarks for meshforge modul
 * Immutable runtime mesh
 * glTF IO module (initial support)
 
----
-
-If you'd like next, I can:
-
-* Create a matching **API Guide for MeshForge** in the same style as Vectrix (module-by-module with usage snippets), or
-* Help you design the first concrete `MeshData` + `VertexSchema` implementation skeleton so you can start coding immediately.
