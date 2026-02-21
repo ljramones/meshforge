@@ -1,8 +1,13 @@
 package org.meshforge.loader;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -37,5 +42,31 @@ class MeshLoadersTest {
         MeshLoaders loaders = MeshLoaders.defaults();
         IOException ex = assertThrows(IOException.class, () -> loaders.load(Path.of("mesh.xyz")));
         assertTrue(ex.getMessage().contains("Unsupported mesh format"));
+    }
+
+    @Test
+    void defaultsDispatchesStlLoader(@TempDir Path tempDir) throws Exception {
+        Path file = tempDir.resolve("simple.stl");
+        Files.write(file, binaryTriangleStl());
+
+        var mesh = MeshLoaders.defaults().load(file);
+        assertEquals(3, mesh.vertexCount());
+        assertEquals(3, mesh.indicesOrNull().length);
+    }
+
+    private static byte[] binaryTriangleStl() {
+        byte[] bytes = new byte[84 + 50];
+        byte[] header = "meshforge-binary-stl".getBytes(StandardCharsets.US_ASCII);
+        System.arraycopy(header, 0, bytes, 0, header.length);
+
+        ByteBuffer.wrap(bytes, 80, 4).order(ByteOrder.LITTLE_ENDIAN).putInt(1);
+        ByteBuffer tri = ByteBuffer.wrap(bytes, 84, 50).order(ByteOrder.LITTLE_ENDIAN);
+        tri.putFloat(0f).putFloat(0f).putFloat(1f);
+        tri.putFloat(0f).putFloat(0f).putFloat(0f);
+        tri.putFloat(1f).putFloat(0f).putFloat(0f);
+        tri.putFloat(0f).putFloat(1f).putFloat(0f);
+        tri.putShort((short) 0);
+
+        return bytes;
     }
 }

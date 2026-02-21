@@ -31,14 +31,14 @@ Important constraint:
 
 Implemented now:
 - OBJ (minimal positions + indexed triangles)
-- STL (ASCII, triangle facets)
+- STL (ASCII + binary, triangle facets)
 - PLY (ASCII, polygon triangulation)
 - OFF (polygon triangulation)
 
 2. Low-risk text formats
 - OFF
 - PLY
-- STL (ASCII first, binary second)
+- STL (done: ASCII + binary)
 - WRL (subset)
 
 3. Structured scene formats
