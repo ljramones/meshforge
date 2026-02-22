@@ -373,6 +373,34 @@ Snapshot (February 21, 2026, local machine run):
 
 These are fixture-level throughput indicators and will vary by CPU/JVM/load.
 
+## Phase-Split Fixture Timings
+
+Granular breakdown per fixture (parse / pipeline / pack / total), with median and p95 over 7 timed runs after 3 warmup runs.
+
+Command:
+
+```bash
+mvn -pl meshforge-demo -DskipTests compile
+mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming exec:java
+```
+
+Latest snapshot (February 21, 2026, local machine run):
+
+| Fixture | Parse (median / p95) ms | Pipeline (median / p95) ms | Pack (median / p95) ms | Total (median / p95) ms |
+|---|---:|---:|---:|---:|
+| `beast.obj` | 42 / 58 | 0 / 0 | 2 / 4 | 47 / 63 |
+| `cow.obj` | 2 / 2 | 0 / 0 | 0 / 0 | 2 / 2 |
+| `lucy.obj` | 56 / 58 | 0 / 0 | 3 / 3 | 60 / 63 |
+| `nefertiti.obj` | 48 / 49 | 0 / 0 | 3 / 3 | 52 / 53 |
+| `RevitHouse.obj` | 697 / 730 | 6 / 46 | 89 / 116 | 811 / 854 |
+| `stanford-bunny.obj` | 28 / 30 | 0 / 0 | 2 / 2 | 31 / 33 |
+| `suzanne.obj` | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 |
+| `teapot.obj` | 2 / 2 | 0 / 0 | 0 / 0 | 2 / 2 |
+| `xyzrgb_dragon.obj` | 147 / 190 | 1 / 2 | 8 / 12 | 158 / 205 |
+
+CSV output is written to `perf/results/phase-split-<timestamp>.csv`.
+For very small fixtures, millisecond rounding can show `0 ms`; use larger iteration counts if you need finer phase resolution.
+
 ---
 
 # Current Scope (v1)
