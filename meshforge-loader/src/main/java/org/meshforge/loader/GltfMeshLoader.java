@@ -29,6 +29,11 @@ import java.util.Map;
  * Minimal glTF loader supporting data URI buffers and meshopt-compressed bufferViews.
  */
 public final class GltfMeshLoader implements MeshFileLoader {
+    private static final int GLB_MAGIC = 0x46546C67;
+    private static final int GLB_VERSION_2 = 2;
+    private static final int GLB_CHUNK_JSON = 0x4E4F534A;
+    private static final int GLB_CHUNK_BIN = 0x004E4942;
+
     private static final int COMPONENT_FLOAT = 5126;
     private static final int COMPONENT_UNSIGNED_INT = 5125;
     private static final int COMPONENT_UNSIGNED_SHORT = 5123;
@@ -43,7 +48,7 @@ public final class GltfMeshLoader implements MeshFileLoader {
     public MeshData load(Path path, MeshLoadOptions options) throws IOException {
         String name = path.getFileName() == null ? "" : path.getFileName().toString().toLowerCase();
         if (name.endsWith(".glb")) {
-            throw new IOException("glb loading is not implemented yet: " + path);
+            return loadGlb(path, options == null ? MeshLoadOptions.defaults() : options);
         }
         if (!name.endsWith(".gltf")) {
             throw new IOException("Unsupported glTF extension: " + path);
@@ -53,6 +58,16 @@ public final class GltfMeshLoader implements MeshFileLoader {
 
     private MeshData loadGltf(Path path, MeshLoadOptions options) throws IOException {
         String json = Files.readString(path, StandardCharsets.UTF_8);
+        return loadFromJson(path, options, json, null);
+    }
+
+    private MeshData loadGlb(Path path, MeshLoadOptions options) throws IOException {
+        byte[] bytes = Files.readAllBytes(path);
+        GlbDocument glb = parseGlb(path, bytes);
+        return loadFromJson(path, options, glb.json(), glb.binChunk());
+    }
+
+    private MeshData loadFromJson(Path path, MeshLoadOptions options, String json, byte[] embeddedBin) throws IOException {
         Map<String, Object> root;
         try {
             root = MiniJson.parseObject(json);
@@ -60,7 +75,7 @@ public final class GltfMeshLoader implements MeshFileLoader {
             throw new IOException("Invalid glTF JSON: " + path + " (" + ex.getMessage() + ")", ex);
         }
 
-        List<byte[]> buffers = decodeBuffers(root, path);
+        List<byte[]> buffers = decodeBuffers(root, path, embeddedBin);
         List<Map<String, Object>> bufferViews = listOfObjects(root.get("bufferViews"), "bufferViews");
         List<Map<String, Object>> accessors = listOfObjects(root.get("accessors"), "accessors");
         Map<String, Object> primitive = firstPrimitive(root);
@@ -272,12 +287,20 @@ public final class GltfMeshLoader implements MeshFileLoader {
         return new ViewData(out, defaultStride);
     }
 
-    private static List<byte[]> decodeBuffers(Map<String, Object> root, Path path) throws IOException {
+    private static List<byte[]> decodeBuffers(Map<String, Object> root, Path path, byte[] embeddedBin) throws IOException {
         List<Map<String, Object>> buffers = listOfObjects(root.get("buffers"), "buffers");
         List<byte[]> out = new ArrayList<>(buffers.size());
         for (int i = 0; i < buffers.size(); i++) {
             Map<String, Object> buffer = buffers.get(i);
-            String uri = asString(buffer.get("uri"), "buffers[" + i + "].uri");
+            Object uriValue = buffer.get("uri");
+            if (uriValue == null) {
+                if (embeddedBin != null && i == 0) {
+                    out.add(embeddedBin);
+                    continue;
+                }
+                throw new IOException("buffers[" + i + "] is missing uri and no embedded BIN chunk is available");
+            }
+            String uri = asString(uriValue, "buffers[" + i + "].uri");
             if (!uri.startsWith("data:")) {
                 throw new IOException("Only data URI buffers are supported for now: " + path);
             }
@@ -295,6 +318,60 @@ public final class GltfMeshLoader implements MeshFileLoader {
             out.add(decoded);
         }
         return out;
+    }
+
+    private static GlbDocument parseGlb(Path path, byte[] bytes) throws IOException {
+        if (bytes.length < 20) {
+            throw new IOException("Invalid GLB (too small): " + path);
+        }
+        ByteBuffer bb = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
+        int magic = bb.getInt();
+        int version = bb.getInt();
+        int totalLength = bb.getInt();
+        if (magic != GLB_MAGIC) {
+            throw new IOException("Invalid GLB magic: " + path);
+        }
+        if (version != GLB_VERSION_2) {
+            throw new IOException("Unsupported GLB version " + version + ": " + path);
+        }
+        if (totalLength != bytes.length) {
+            throw new IOException("GLB length mismatch: header=" + totalLength + " actual=" + bytes.length);
+        }
+
+        byte[] jsonChunk = null;
+        byte[] binChunk = null;
+        while (bb.remaining() >= 8) {
+            int chunkLength = bb.getInt();
+            int chunkType = bb.getInt();
+            if (chunkLength < 0 || chunkLength > bb.remaining()) {
+                throw new IOException("Invalid GLB chunk length: " + chunkLength);
+            }
+            byte[] chunkData = new byte[chunkLength];
+            bb.get(chunkData);
+            if (chunkType == GLB_CHUNK_JSON && jsonChunk == null) {
+                jsonChunk = chunkData;
+            } else if (chunkType == GLB_CHUNK_BIN && binChunk == null) {
+                binChunk = chunkData;
+            }
+        }
+        if (jsonChunk == null) {
+            throw new IOException("GLB missing JSON chunk: " + path);
+        }
+        String json = decodeJsonChunk(jsonChunk);
+        return new GlbDocument(json, binChunk);
+    }
+
+    private static String decodeJsonChunk(byte[] jsonChunk) {
+        int end = jsonChunk.length;
+        while (end > 0) {
+            int b = jsonChunk[end - 1] & 0xFF;
+            if (b == 0 || b == 0x20 || b == 0x09 || b == 0x0A || b == 0x0D) {
+                end--;
+            } else {
+                break;
+            }
+        }
+        return new String(jsonChunk, 0, end, StandardCharsets.UTF_8);
     }
 
     private static Map<String, Object> firstPrimitive(Map<String, Object> root) throws IOException {
@@ -390,5 +467,8 @@ public final class GltfMeshLoader implements MeshFileLoader {
         int componentSize,
         int byteStride
     ) {
+    }
+
+    private record GlbDocument(String json, byte[] binChunk) {
     }
 }

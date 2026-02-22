@@ -18,6 +18,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GltfMeshLoaderTest {
+    private static final int GLB_MAGIC = 0x46546C67;
+    private static final int GLB_VERSION_2 = 2;
+    private static final int GLB_CHUNK_JSON = 0x4E4F534A;
+    private static final int GLB_CHUNK_BIN = 0x004E4942;
+
     @Test
     void loadsMeshoptCompressedGltfWhenDecodeEnabled(@TempDir Path tempDir) throws Exception {
         byte[] rawPositions = floatVec3Bytes(
@@ -139,6 +144,79 @@ class GltfMeshLoaderTest {
         assertTrue(ex.getMessage().contains("meshopt decode is disabled"));
     }
 
+    @Test
+    void loadsMeshoptCompressedGlbWhenDecodeEnabled(@TempDir Path tempDir) throws Exception {
+        byte[] rawPositions = floatVec3Bytes(
+            0f, 0f, 0f,
+            1f, 0f, 0f,
+            0f, 1f, 0f
+        );
+        byte[] rawIndices = u32Bytes(0, 1, 2);
+        byte[] compressedPositions = lz4Literal(rawPositions);
+        byte[] compressedIndices = lz4Literal(rawIndices);
+        byte[] binPayload = concat(compressedPositions, compressedIndices);
+
+        String json = """
+            {
+              "asset": {"version":"2.0"},
+              "buffers": [{"byteLength": %d}],
+              "bufferViews": [
+                {
+                  "byteLength": %d,
+                  "extensions": {
+                    "KHR_meshopt_compression": {
+                      "buffer": 0,
+                      "byteOffset": 0,
+                      "byteLength": %d,
+                      "byteStride": 12,
+                      "count": 3,
+                      "mode": "ATTRIBUTES",
+                      "filter": "NONE"
+                    }
+                  }
+                },
+                {
+                  "byteLength": %d,
+                  "extensions": {
+                    "KHR_meshopt_compression": {
+                      "buffer": 0,
+                      "byteOffset": %d,
+                      "byteLength": %d,
+                      "byteStride": 4,
+                      "count": 3,
+                      "mode": "TRIANGLES",
+                      "filter": "NONE"
+                    }
+                  }
+                }
+              ],
+              "accessors": [
+                {"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3"},
+                {"bufferView": 1, "componentType": 5125, "count": 3, "type": "SCALAR"}
+              ],
+              "meshes": [{"primitives": [{"attributes": {"POSITION": 0}, "indices": 1}]}]
+            }
+            """.formatted(
+            binPayload.length,
+            rawPositions.length,
+            compressedPositions.length,
+            rawIndices.length,
+            compressedPositions.length,
+            compressedIndices.length
+        );
+
+        byte[] glb = buildGlb(json, binPayload);
+        Path file = tempDir.resolve("meshopt.glb");
+        Files.write(file, glb);
+
+        MeshData mesh = MeshLoaders.planned().load(file, MeshLoadOptions.defaults());
+        assertEquals(3, mesh.vertexCount());
+        assertEquals(3, mesh.indicesOrNull().length);
+        assertEquals(1f, mesh.attribute(org.meshforge.core.attr.AttributeSemantic.POSITION, 0).getFloat(1, 0));
+        assertEquals(1f, mesh.attribute(org.meshforge.core.attr.AttributeSemantic.POSITION, 0).getFloat(2, 1));
+        assertEquals(2, mesh.indicesOrNull()[2]);
+    }
+
     private static byte[] lz4Literal(byte[] raw) {
         int len = raw.length;
         if (len < 15) {
@@ -180,5 +258,36 @@ class GltfMeshLoaderTest {
         System.arraycopy(a, 0, out, 0, a.length);
         System.arraycopy(b, 0, out, a.length, b.length);
         return out;
+    }
+
+    private static byte[] buildGlb(String json, byte[] binPayload) {
+        byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);
+        int jsonPadded = align4(jsonBytes.length);
+        int binPadded = align4(binPayload.length);
+        int totalLength = 12 + 8 + jsonPadded + 8 + binPadded;
+
+        ByteBuffer bb = ByteBuffer.allocate(totalLength).order(ByteOrder.LITTLE_ENDIAN);
+        bb.putInt(GLB_MAGIC);
+        bb.putInt(GLB_VERSION_2);
+        bb.putInt(totalLength);
+
+        bb.putInt(jsonPadded);
+        bb.putInt(GLB_CHUNK_JSON);
+        bb.put(jsonBytes);
+        while ((bb.position() & 3) != 0) {
+            bb.put((byte) 0x20);
+        }
+
+        bb.putInt(binPadded);
+        bb.putInt(GLB_CHUNK_BIN);
+        bb.put(binPayload);
+        while ((bb.position() & 3) != 0) {
+            bb.put((byte) 0);
+        }
+        return bb.array();
+    }
+
+    private static int align4(int n) {
+        return (n + 3) & ~3;
     }
 }
