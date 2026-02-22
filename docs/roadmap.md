@@ -2,6 +2,13 @@
 
 This roadmap tracks planned features after the current v1 foundation.
 
+## Active Now (Part 2: SoA + SIMD)
+- [ ] Loader parse hot-path hardening (OBJ numeric/token parsing throughput).
+- [ ] Add parse-focused fixture timing loops for fast A/B validation.
+- [ ] Add SIMD-ready kernel boundary around normal/attribute packing and conversion.
+- [ ] Track normalized parse throughput (`us / 1M verts`) on baseline fixtures.
+- [ ] Keep parity tests green between legacy and fast OBJ loaders on all baseline fixtures.
+
 ## Near Term (v1 completion)
 - Harden current ops with more fixture-based tests and benchmarks.
 - Add JMH benchmarks for `OptimizeVertexCacheOp`, weld/compact, and packing throughput.

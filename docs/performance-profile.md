@@ -167,6 +167,12 @@ Shortcut via phase-split runner:
 mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast --profile-pack" exec:java
 ```
 
+Parse-only loop for loader optimization (Part 2):
+
+```bash
+mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast --parse-only --fixture=RevitHouse --warmup=5 --runs=15" exec:java
+```
+
 Outputs CSV to `perf/results/pack-breakdown-*.csv`.
 Use `--pack-minimal` to switch to `Packers.realtimeMinimal()` for quick attribute-cost deltas.
 

@@ -384,6 +384,8 @@ mvn -pl meshforge-demo -DskipTests compile
 mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--legacy" exec:java
 mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast" exec:java
 mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast --pack-minimal" exec:java
+# parse-only profiling loop for loader optimization work (Part 2)
+mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast --parse-only --fixture=RevitHouse --warmup=5 --runs=15" exec:java
 ```
 
 Latest fast-loader snapshot (February 22, 2026, local machine run):

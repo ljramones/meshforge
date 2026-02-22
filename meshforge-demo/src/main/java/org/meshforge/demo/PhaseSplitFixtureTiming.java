@@ -23,8 +23,8 @@ import java.util.Locale;
  * parse (load) / pipeline / pack / total, reported as median+p95.
  */
 public final class PhaseSplitFixtureTiming {
-    private static final int WARMUP_RUNS = 3;
-    private static final int TIMED_RUNS = 7;
+    private static final int DEFAULT_WARMUP_RUNS = 3;
+    private static final int DEFAULT_TIMED_RUNS = 7;
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
     private PhaseSplitFixtureTiming() {
@@ -34,7 +34,10 @@ public final class PhaseSplitFixtureTiming {
         boolean fastLoader = true;
         boolean profilePack = false;
         boolean packMinimal = false;
+        boolean parseOnly = false;
         String fixtureFilter = null;
+        int warmupRuns = DEFAULT_WARMUP_RUNS;
+        int timedRuns = DEFAULT_TIMED_RUNS;
         for (String arg : args) {
             if ("--legacy".equals(arg)) {
                 fastLoader = false;
@@ -44,8 +47,14 @@ public final class PhaseSplitFixtureTiming {
                 profilePack = true;
             } else if ("--pack-minimal".equals(arg)) {
                 packMinimal = true;
+            } else if ("--parse-only".equals(arg)) {
+                parseOnly = true;
             } else if (arg.startsWith("--fixture=")) {
                 fixtureFilter = arg.substring("--fixture=".length()).trim().toLowerCase(Locale.ROOT);
+            } else if (arg.startsWith("--warmup=")) {
+                warmupRuns = parsePositive(arg.substring("--warmup=".length()), "warmup");
+            } else if (arg.startsWith("--runs=")) {
+                timedRuns = parsePositive(arg.substring("--runs=".length()), "runs");
             }
         }
 
@@ -79,12 +88,13 @@ public final class PhaseSplitFixtureTiming {
         System.out.println(
             "Phase-split timing (" + (fastLoader ? "fast" : "legacy") +
                 ", " + (packMinimal ? "minimal" : "realtime") + " pack spec" +
-                ", median + p95 over " + TIMED_RUNS +
-                " timed runs after " + WARMUP_RUNS + " warmup runs)"
+                ", " + (parseOnly ? "parse-only" : "full phases") +
+                ", median + p95 over " + timedRuns +
+                " timed runs after " + warmupRuns + " warmup runs)"
         );
         System.out.println();
         for (Path fixture : fixtures) {
-            TimingStats stats = runFixture(loaders, fixture, packMinimal);
+            TimingStats stats = runFixture(loaders, fixture, packMinimal, parseOnly, warmupRuns, timedRuns);
             all.add(stats);
             System.out.printf(
                 Locale.ROOT,
@@ -99,37 +109,49 @@ public final class PhaseSplitFixtureTiming {
 
         Path outDir = Path.of("perf", "results");
         Files.createDirectories(outDir);
-        Path outFile = outDir.resolve("phase-split-" + (fastLoader ? "fast" : "legacy") + "-" + LocalDateTime.now().format(TS) + ".csv");
+        String suffix = parseOnly ? "-parse-only" : "";
+        Path outFile = outDir.resolve("phase-split-" + (fastLoader ? "fast" : "legacy") + suffix + "-" + LocalDateTime.now().format(TS) + ".csv");
         writeCsv(outFile, all);
         System.out.println();
         System.out.println("Results written to: " + outFile.toAbsolutePath());
     }
 
-    private static TimingStats runFixture(MeshLoaders loaders, Path fixture, boolean packMinimal) throws IOException {
+    private static TimingStats runFixture(
+        MeshLoaders loaders,
+        Path fixture,
+        boolean packMinimal,
+        boolean parseOnly,
+        int warmupRuns,
+        int timedRuns
+    ) throws IOException {
         PackSpec packSpec = packMinimal ? Packers.realtimeMinimal() : Packers.realtime();
-        List<Long> parseUs = new ArrayList<>(TIMED_RUNS);
-        List<Long> pipelineUs = new ArrayList<>(TIMED_RUNS);
-        List<Long> packUs = new ArrayList<>(TIMED_RUNS);
-        List<Long> totalUs = new ArrayList<>(TIMED_RUNS);
+        List<Long> parseUs = new ArrayList<>(timedRuns);
+        List<Long> pipelineUs = new ArrayList<>(timedRuns);
+        List<Long> packUs = new ArrayList<>(timedRuns);
+        List<Long> totalUs = new ArrayList<>(timedRuns);
 
-        for (int run = 0; run < WARMUP_RUNS + TIMED_RUNS; run++) {
+        for (int run = 0; run < warmupRuns + timedRuns; run++) {
             long t0 = System.nanoTime();
 
             long tp = System.nanoTime();
             MeshData mesh = loaders.load(fixture);
             long parseNs = System.nanoTime() - tp;
 
-            long to = System.nanoTime();
-            MeshData processed = Pipelines.realtimeFast(mesh);
-            long pipelineNs = System.nanoTime() - to;
+            long pipelineNs = 0L;
+            long packNs = 0L;
+            if (!parseOnly) {
+                long to = System.nanoTime();
+                MeshData processed = Pipelines.realtimeFast(mesh);
+                pipelineNs = System.nanoTime() - to;
 
-            long tk = System.nanoTime();
-            MeshPacker.pack(processed, packSpec);
-            long packNs = System.nanoTime() - tk;
+                long tk = System.nanoTime();
+                MeshPacker.pack(processed, packSpec);
+                packNs = System.nanoTime() - tk;
+            }
 
             long totalNs = System.nanoTime() - t0;
 
-            if (run >= WARMUP_RUNS) {
+            if (run >= warmupRuns) {
                 parseUs.add(parseNs / 1_000L);
                 pipelineUs.add(pipelineNs / 1_000L);
                 packUs.add(packNs / 1_000L);
@@ -144,6 +166,14 @@ public final class PhaseSplitFixtureTiming {
             median(packUs), p95(packUs),
             median(totalUs), p95(totalUs)
         );
+    }
+
+    private static int parsePositive(String raw, String label) {
+        int parsed = Integer.parseInt(raw);
+        if (parsed <= 0) {
+            throw new IllegalArgumentException(label + " must be > 0");
+        }
+        return parsed;
     }
 
     private static long median(List<Long> values) {
