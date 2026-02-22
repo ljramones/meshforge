@@ -6,6 +6,8 @@ import javafx.scene.Group;
 import javafx.scene.PerspectiveCamera;
 import javafx.scene.Scene;
 import javafx.scene.SubScene;
+import javafx.scene.AmbientLight;
+import javafx.scene.PointLight;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ToolBar;
@@ -69,6 +71,13 @@ public final class MeshViewerApp extends Application {
 
     private SubScene createViewport() {
         Group root3d = new Group(world);
+        AmbientLight ambient = new AmbientLight(Color.color(0.55, 0.55, 0.60));
+        PointLight key = new PointLight(Color.color(1.0, 1.0, 1.0));
+        key.setTranslateX(-6.0);
+        key.setTranslateY(-5.0);
+        key.setTranslateZ(-6.0);
+        root3d.getChildren().addAll(ambient, key);
+
         SubScene sub = new SubScene(root3d, 1000, 700, true, null);
         sub.setFill(Color.rgb(28, 31, 38));
 
@@ -141,8 +150,12 @@ public final class MeshViewerApp extends Application {
             world.getChildren().setAll(view);
             int indexCount = mesh.indicesOrNull() == null ? 0 : mesh.indicesOrNull().length;
             int triangleCount = indexCount / 3;
+            float radius = mesh.boundsOrNull() == null || mesh.boundsOrNull().sphere() == null
+                ? Float.NaN
+                : mesh.boundsOrNull().sphere().radius();
             status.setText(file.getName() + " | vertices=" + mesh.vertexCount() +
-                " triangles=" + triangleCount + " indices=" + indexCount);
+                " triangles=" + triangleCount + " indices=" + indexCount +
+                " radius=" + String.format("%.4f", radius));
         } catch (Exception ex) {
             status.setText("Load failed: " + ex.getClass().getSimpleName() + ": " + ex.getMessage());
             ex.printStackTrace(System.err);
