@@ -12,7 +12,10 @@ import org.meshforge.pack.buffer.PackedMesh;
 import org.meshforge.pack.buffer.MeshletBuffers;
 import org.meshforge.pack.packer.MeshPacker;
 import org.meshforge.pack.spec.PackSpec;
+import org.vectrix.core.Vector3f;
+import org.vectrix.gpu.OctaNormal;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -180,5 +183,52 @@ class MeshPackerTest {
             totalTri += m.triangleCount();
         }
         assertEquals(indices.length / 3, totalTri);
+    }
+
+    @Test
+    void realtimeWithOctaNormalsPacksExpectedFormatAndRoundTrips() {
+        VertexSchema schema = VertexSchema.builder()
+            .add(AttributeSemantic.POSITION, 0, VertexFormat.F32x3)
+            .add(AttributeSemantic.NORMAL, 0, VertexFormat.F32x3)
+            .build();
+
+        MeshData mesh = new MeshData(
+            Topology.TRIANGLES,
+            schema,
+            3,
+            new int[] {0, 1, 2},
+            List.of(new Submesh(0, 3, "m"))
+        );
+
+        mesh.attribute(AttributeSemantic.POSITION, 0).set3f(0, 0.0f, 0.0f, 0.0f);
+        mesh.attribute(AttributeSemantic.POSITION, 0).set3f(1, 1.0f, 0.0f, 0.0f);
+        mesh.attribute(AttributeSemantic.POSITION, 0).set3f(2, 0.0f, 1.0f, 0.0f);
+        mesh.attribute(AttributeSemantic.NORMAL, 0).set3f(0, 0.0f, 0.0f, 1.0f);
+        mesh.attribute(AttributeSemantic.NORMAL, 0).set3f(1, 0.57735f, 0.57735f, 0.57735f);
+        mesh.attribute(AttributeSemantic.NORMAL, 0).set3f(2, -0.2f, 0.95f, 0.24f);
+
+        PackedMesh packed = MeshPacker.pack(mesh, PackSpec.realtimeWithOctaNormals());
+
+        var normalEntry = packed.layout().entry(new AttributeKey(AttributeSemantic.NORMAL, 0));
+        assertNotNull(normalEntry);
+        assertEquals(VertexFormat.OCTA_SNORM16x2, normalEntry.format());
+        assertEquals(PackSpec.NormalPacking.OCTA_SNORM16x2, PackSpec.realtimeWithOctaNormals().normalPacking());
+
+        ByteBuffer vb = packed.vertexBuffer();
+        int stride = packed.layout().strideBytes();
+        int normalOff = normalEntry.offsetBytes();
+
+        Vector3f decoded = new Vector3f();
+        int packed0 = vb.getInt(normalOff);
+        OctaNormal.decodeSnorm16(packed0, decoded);
+        assertEquals(0.0f, decoded.x(), 0.02f);
+        assertEquals(0.0f, decoded.y(), 0.02f);
+        assertEquals(1.0f, decoded.z(), 0.02f);
+
+        int packed1 = vb.getInt(stride + normalOff);
+        OctaNormal.decodeSnorm16(packed1, decoded);
+        assertEquals(0.57735f, decoded.x(), 0.03f);
+        assertEquals(0.57735f, decoded.y(), 0.03f);
+        assertEquals(0.57735f, decoded.z(), 0.03f);
     }
 }

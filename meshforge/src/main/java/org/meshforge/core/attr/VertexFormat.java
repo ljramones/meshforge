@@ -26,7 +26,8 @@ public enum VertexFormat {
 
     // Normalized packed
     UNORM8x4(ScalarKind.INT, 4, 4, true),
-    SNORM8x4(ScalarKind.INT, 4, 4, true);
+    SNORM8x4(ScalarKind.INT, 4, 4, true),
+    OCTA_SNORM16x2(ScalarKind.INT, 2, 4, true);
 
     public enum ScalarKind { FLOAT, INT, SHORT, BYTE }
 

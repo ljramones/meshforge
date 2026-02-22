@@ -167,6 +167,7 @@ Preset shortcuts:
 mesh = Pipelines.realtime(mesh);      // full import-time optimization path
 mesh = Pipelines.realtimeFast(mesh);  // fast path for already-clean assets
 PackedMesh packed = MeshPacker.pack(mesh, Packers.realtimeFast());
+PackedMesh packedOcta = MeshPacker.pack(mesh, Packers.realtimeWithOctaNormals());
 ```
 
 ---

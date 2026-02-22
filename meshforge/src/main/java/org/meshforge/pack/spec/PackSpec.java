@@ -14,6 +14,8 @@ public final class PackSpec {
 
     public enum IndexPolicy { AUTO_16_IF_POSSIBLE, FORCE_32 }
 
+    public enum NormalPacking { SNORM8x4, OCTA_SNORM16x2 }
+
     private final LayoutMode layoutMode;
     private final int alignmentBytes;
     private final IndexPolicy indexPolicy;
@@ -24,6 +26,7 @@ public final class PackSpec {
     private final boolean meshletsEnabled;
     private final int maxMeshletVertices;
     private final int maxMeshletTriangles;
+    private final NormalPacking normalPacking;
     private final Map<AttributeKey, VertexFormat> targetFormats;
 
     private PackSpec(Builder builder) {
@@ -37,6 +40,7 @@ public final class PackSpec {
         this.meshletsEnabled = builder.meshletsEnabled;
         this.maxMeshletVertices = builder.maxMeshletVertices;
         this.maxMeshletTriangles = builder.maxMeshletTriangles;
+        this.normalPacking = builder.normalPacking;
         this.targetFormats = Collections.unmodifiableMap(new LinkedHashMap<>(builder.targetFormats));
     }
 
@@ -84,6 +88,10 @@ public final class PackSpec {
         return maxMeshletTriangles;
     }
 
+    public NormalPacking normalPacking() {
+        return normalPacking;
+    }
+
     public VertexFormat targetFormat(AttributeSemantic semantic, int setIndex) {
         return targetFormats.get(new AttributeKey(semantic, setIndex));
     }
@@ -117,6 +125,7 @@ public final class PackSpec {
             .alignment(16)
             .indexPolicy(IndexPolicy.AUTO_16_IF_POSSIBLE)
             .target(AttributeSemantic.POSITION, 0, VertexFormat.F32x3)
+            .normalPacking(NormalPacking.SNORM8x4)
             .target(AttributeSemantic.NORMAL, 0, VertexFormat.SNORM8x4)
             .target(AttributeSemantic.TANGENT, 0, VertexFormat.SNORM8x4)
             .target(AttributeSemantic.UV, 0, VertexFormat.F16x2)
@@ -162,6 +171,7 @@ public final class PackSpec {
             .alignment(16)
             .indexPolicy(IndexPolicy.AUTO_16_IF_POSSIBLE)
             .target(AttributeSemantic.POSITION, 0, VertexFormat.F32x3)
+            .normalPacking(NormalPacking.SNORM8x4)
             .target(AttributeSemantic.NORMAL, 0, VertexFormat.SNORM8x4)
             .target(AttributeSemantic.TANGENT, 0, VertexFormat.SNORM8x4)
             .target(AttributeSemantic.UV, 0, VertexFormat.F16x2)
@@ -178,6 +188,26 @@ public final class PackSpec {
             .build();
     }
 
+    public static PackSpec realtimeWithOctaNormals() {
+        return builder()
+            .layout(LayoutMode.INTERLEAVED)
+            .alignment(16)
+            .indexPolicy(IndexPolicy.AUTO_16_IF_POSSIBLE)
+            .target(AttributeSemantic.POSITION, 0, VertexFormat.F32x3)
+            .normalPacking(NormalPacking.OCTA_SNORM16x2)
+            .target(AttributeSemantic.NORMAL, 0, VertexFormat.OCTA_SNORM16x2)
+            .target(AttributeSemantic.TANGENT, 0, VertexFormat.SNORM8x4)
+            .target(AttributeSemantic.UV, 0, VertexFormat.F16x2)
+            .target(AttributeSemantic.COLOR, 0, VertexFormat.UNORM8x4)
+            .target(AttributeSemantic.JOINTS, 0, VertexFormat.U8x4)
+            .target(AttributeSemantic.WEIGHTS, 0, VertexFormat.UNORM8x4)
+            .dropUnknownAttributes(true)
+            .computeBoundsIfMissing(true)
+            .failIfMissingNormals(false)
+            .failIfMissingTangents(false)
+            .build();
+    }
+
     public static final class Builder {
         private LayoutMode layoutMode = LayoutMode.INTERLEAVED;
         private int alignmentBytes = 16;
@@ -189,6 +219,7 @@ public final class PackSpec {
         private boolean meshletsEnabled;
         private int maxMeshletVertices = 128;
         private int maxMeshletTriangles = 64;
+        private NormalPacking normalPacking = NormalPacking.SNORM8x4;
         private final LinkedHashMap<AttributeKey, VertexFormat> targetFormats = new LinkedHashMap<>();
 
         public Builder layout(LayoutMode mode) {
@@ -250,8 +281,25 @@ public final class PackSpec {
             return this;
         }
 
+        public Builder normalPacking(NormalPacking mode) {
+            this.normalPacking = Objects.requireNonNull(mode, "mode");
+            if (mode == NormalPacking.OCTA_SNORM16x2) {
+                targetFormats.put(new AttributeKey(AttributeSemantic.NORMAL, 0), VertexFormat.OCTA_SNORM16x2);
+            } else {
+                targetFormats.put(new AttributeKey(AttributeSemantic.NORMAL, 0), VertexFormat.SNORM8x4);
+            }
+            return this;
+        }
+
         public Builder target(AttributeSemantic semantic, int setIndex, VertexFormat format) {
             targetFormats.put(new AttributeKey(semantic, setIndex), Objects.requireNonNull(format, "format"));
+            if (semantic == AttributeSemantic.NORMAL && setIndex == 0) {
+                if (format == VertexFormat.OCTA_SNORM16x2) {
+                    normalPacking = NormalPacking.OCTA_SNORM16x2;
+                } else if (format == VertexFormat.SNORM8x4) {
+                    normalPacking = NormalPacking.SNORM8x4;
+                }
+            }
             return this;
         }
 

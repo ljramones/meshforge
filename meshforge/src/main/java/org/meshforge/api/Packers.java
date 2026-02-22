@@ -29,4 +29,8 @@ public final class Packers {
     public static PackSpec realtimeWithMeshlets() {
         return PackSpec.realtimeWithMeshlets();
     }
+
+    public static PackSpec realtimeWithOctaNormals() {
+        return PackSpec.realtimeWithOctaNormals();
+    }
 }

@@ -13,6 +13,7 @@ import org.meshforge.pack.buffer.PackedMesh;
 import org.meshforge.pack.layout.VertexLayout;
 import org.meshforge.pack.spec.PackSpec;
 import org.vectrix.gpu.Half;
+import org.vectrix.gpu.OctaNormal;
 import org.vectrix.gpu.PackedNorm;
 
 import java.nio.ByteBuffer;
@@ -141,6 +142,7 @@ public final class MeshPacker {
         boolean hasColor = colorData != null && colorOff >= 0;
         boolean hasJoints = jointsData != null && jointsOff >= 0;
         boolean hasWeights = weightsData != null && weightsOff >= 0;
+        VertexFormat normalFormat = normalEntry == null ? null : normalEntry.format();
 
         boolean hotPosNormalLayout = posOff == 0 && normalOff == 12 && stride == 16;
         boolean hotPosOnlyLayout = posOff == 0 && stride == 16;
@@ -152,7 +154,7 @@ public final class MeshPacker {
                     vertexBuffer.putFloat(positionData[p]);
                     vertexBuffer.putFloat(positionData[p + 1]);
                     vertexBuffer.putFloat(positionData[p + 2]);
-                    vertexBuffer.putInt(packSnorm8x4Inline(normalData[p], normalData[p + 1], normalData[p + 2], 0.0f));
+                    vertexBuffer.putInt(packNormalToInt(normalFormat, normalData[p], normalData[p + 1], normalData[p + 2]));
                 }
             } else {
                 for (int i = 0; i < vertexCount; i++) {
@@ -161,7 +163,7 @@ public final class MeshPacker {
                     vertexBuffer.putFloat(base + posOff, positionData[p]);
                     vertexBuffer.putFloat(base + posOff + 4, positionData[p + 1]);
                     vertexBuffer.putFloat(base + posOff + 8, positionData[p + 2]);
-                    vertexBuffer.putInt(base + normalOff, packSnorm8x4Inline(normalData[p], normalData[p + 1], normalData[p + 2], 0.0f));
+                    writeNormal(vertexBuffer, base + normalOff, normalFormat, normalData[p], normalData[p + 1], normalData[p + 2]);
                 }
             }
         } else if (!profileEnabled && !hasNormal && !hasTangent && !hasUv && !hasColor && !hasJoints && !hasWeights) {
@@ -209,8 +211,14 @@ public final class MeshPacker {
                 if (hasNormal) {
                     long sectionStart = sampleThisVertex ? System.nanoTime() : 0L;
                     int src = i * 3;
-                    int packed = packSnorm8x4Inline(normalData[src], normalData[src + 1], normalData[src + 2], 0.0f);
-                    vertexBuffer.putInt(base + normalOff, packed);
+                    writeNormal(
+                        vertexBuffer,
+                        base + normalOff,
+                        normalFormat,
+                        normalData[src],
+                        normalData[src + 1],
+                        normalData[src + 2]
+                    );
                     if (sampleThisVertex) {
                         normalPackNs += System.nanoTime() - sectionStart;
                         normalSamples++;
@@ -419,6 +427,23 @@ public final class MeshPacker {
             | ((yi & 0xFF) << 8)
             | ((zi & 0xFF) << 16)
             | ((wi & 0xFF) << 24);
+    }
+
+    private static int packNormalToInt(VertexFormat format, float x, float y, float z) {
+        if (format == VertexFormat.OCTA_SNORM16x2) {
+            return OctaNormal.encodeSnorm16(x, y, z);
+        }
+        return packSnorm8x4Inline(x, y, z, 0.0f);
+    }
+
+    private static void writeNormal(ByteBuffer out, int offset, VertexFormat format, float x, float y, float z) {
+        if (format == VertexFormat.F32x3) {
+            out.putFloat(offset, x);
+            out.putFloat(offset + 4, y);
+            out.putFloat(offset + 8, z);
+            return;
+        }
+        out.putInt(offset, packNormalToInt(format, x, y, z));
     }
 
     private static int snorm8(float v) {
