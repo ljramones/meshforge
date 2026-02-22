@@ -20,6 +20,10 @@ Store assets in this repository under `fixtures/`:
 - `fixtures/off/small`, `fixtures/off/medium`, `fixtures/off/broken`
 - `fixtures/gltf/small`, `fixtures/gltf/medium`, `fixtures/gltf/broken`
 
+Current repo state:
+- Populated now: `fixtures/obj/medium`, `fixtures/stl/medium`, `fixtures/gltf/medium`
+- Present but currently empty: `fixtures/off`, `fixtures/ply`
+
 Naming convention:
 - Valid: `cube-valid.obj`, `bunny-medium.ply`
 - Broken parser case: `missing-face-index.broken.obj`
@@ -35,7 +39,7 @@ mvn -pl meshforge-demo javafx:run
 CLI demo:
 
 ```bash
-mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.MeshForgeDemo -Dexec.args="fixtures/off/small/cube.off" exec:java
+mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.MeshForgeDemo -Dexec.args="fixtures/obj/medium/suzanne.obj" exec:java
 ```
 
 Loader tests should keep tiny inline fixtures for deterministic unit coverage and use `fixtures/` for integration samples.

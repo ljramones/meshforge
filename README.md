@@ -245,6 +245,34 @@ mvn -pl meshforge -Pbench test-compile exec:java   # run JMH benchmarks for mesh
 
 ---
 
+# Demos
+
+The `meshforge-demo` module currently provides two runnable demos:
+
+1. `org.meshforge.demo.MeshForgeDemo` (CLI)
+- Loads one mesh file through `meshforge-loader`
+- Runs the fast realtime pipeline (`Pipelines.realtimeFast`)
+- Packs with `Packers.realtime` and prints mesh/packing stats
+- Run:
+
+```bash
+mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.MeshForgeDemo -Dexec.args="fixtures/obj/medium/suzanne.obj" exec:java
+```
+
+2. `org.meshforge.demo.MeshViewerApp` (JavaFX viewer)
+- File-open UI for `*.obj`, `*.stl`, `*.ply`, `*.off`
+- Loads via `MeshLoaders.defaults()`, processes with `Pipelines.realtimeFast`, validates packing path
+- Displays the mesh in a JavaFX viewport (left-drag orbit, right-drag pan, wheel zoom)
+- Run:
+
+```bash
+mvn -pl meshforge-demo javafx:run
+```
+
+See `docs/mesh-fixtures.md` for sample asset sources and local fixture setup.
+
+---
+
 # Benchmark Snapshot
 
 Command run outside sandbox on February 21, 2026:
