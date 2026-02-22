@@ -249,6 +249,12 @@ mvn -pl meshforge -Pbench test-compile exec:java   # run JMH benchmarks for mesh
 
 The `meshforge-demo` module currently provides two runnable demos:
 
+Prerequisite (fresh checkout or after API changes):
+
+```bash
+mvn -pl meshforge,meshforge-loader -DskipTests install
+```
+
 1. `org.meshforge.demo.MeshForgeDemo` (CLI)
 - Loads one mesh file through `meshforge-loader`
 - Runs the fast realtime pipeline (`Pipelines.realtimeFast`)

@@ -30,6 +30,12 @@ Naming convention:
 
 ## How to use quickly
 
+First, install local meshforge snapshots used by the demo:
+
+```bash
+mvn -pl meshforge,meshforge-loader -DskipTests install
+```
+
 Demo UI:
 
 ```bash
