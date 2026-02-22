@@ -1,14 +1,14 @@
 # MeshForge
 
-MeshForge is a Java mesh authoring and packaging library designed for modern rendering pipelines.
+MeshForge is a pure Java mesh manipulation library focused on authoring, processing, and packing geometry.
 
 It provides a clear, layered workflow:
 
 1. Build or import editable `MeshData`
 2. Apply processing pipelines (`MeshOp`)
-3. Pack into immutable `PackedMesh` for rendering
+3. Pack into immutable `PackedMesh` for downstream consumers
 
-MeshForge is renderer-agnostic and designed to pair naturally with **Vectrix** for math, transforms, culling, and SIMD acceleration.
+MeshForge is renderer-agnostic and designed to pair naturally with **Vectrix** for math and numeric helpers.
 
 ---
 
@@ -67,7 +67,7 @@ In practice:
 Immutable, GPU-ready representation of a mesh.
 
 Why use it:
-Optimized for upload and rendering.
+Optimized for compact, immutable runtime geometry handoff.
 
 In practice:
 Contains packed vertex buffers, index buffer, layout metadata, and bounds.
@@ -103,7 +103,7 @@ PackedMesh (immutable)
 This separation:
 
 * Keeps authoring flexible
-* Keeps runtime immutable and render-friendly
+* Keeps runtime immutable and consumer-friendly
 * Prevents rendering concerns from leaking into authoring logic
 
 The canonical architecture reference is:
@@ -265,7 +265,7 @@ Typical integration:
 * SIMD or Vector API usage (if any) is confined to `pack` internals.
 * Prefer API entry points (`Meshes`, `Ops`, `Packers`) for user workflows.
 * `MeshData` is mutable.
-* `PackedMesh` is immutable and render-safe.
+* `PackedMesh` is immutable and safe to pass to downstream systems.
 
 ---
 
@@ -285,7 +285,8 @@ mvn -pl meshforge -Pbench test-compile exec:java   # run JMH benchmarks for mesh
 
 # Demos
 
-The `meshforge-demo` module currently provides runnable demos:
+The `meshforge-demo` module currently provides runnable demos.
+These are examples for loader/pipeline/packing validation only and are not part of MeshForge's public contract.
 
 Prerequisite (fresh checkout or after API changes):
 
@@ -313,33 +314,9 @@ mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.MeshForgeDemo -Dexec.
 mvn -pl meshforge-demo javafx:run
 ```
 
-3. `org.meshforge.demo.MeshletDispatchDemo` (headless Vulkan mesh-shader readiness)
-- Runs Vulkan preflight, loads a mesh, builds meshlets, compiles minimal mesh/fragment shaders, fetches real vertex positions from packed vertex/index buffers in the mesh shader, dispatches one triangle per meshlet to an offscreen target, and writes `perf/results/meshlet_output.png` plus checksum/luminance metrics.
-- On macOS, requires Vulkan loader (MoltenVK) available to LWJGL.
-- Optional shell preflight (recommended before Java preflight):
-
-```bash
-./scripts/check-vulkan.sh
-```
-
-- Preflight only:
-
-```bash
-mvn -q -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.VulkanPreflight exec:java
-```
-
-- Dispatch demo:
-
-```bash
-mvn -q -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.MeshletDispatchDemo -Dexec.args="fixtures/obj/medium/suzanne.obj" exec:java
-```
-
-- macOS setup hint (adjust `<ver>`):
-
-```bash
-export VK_ICD_FILENAMES="$HOME/VulkanSDK/<ver>/macOS/share/vulkan/icd.d/MoltenVK_icd.json"
-export DYLD_LIBRARY_PATH="$HOME/VulkanSDK/<ver>/macOS/lib:$DYLD_LIBRARY_PATH"
-```
+3. `org.meshforge.demo.MeshletDispatchDemo` and `org.meshforge.demo.VulkanPreflight`
+- These are optional experimental harnesses under `meshforge-demo` only.
+- They are intentionally non-contract and not required for using MeshForge as a mesh manipulation library.
 
 See `docs/mesh-fixtures.md` for sample asset sources and local fixture setup.
 
@@ -395,7 +372,7 @@ How to read the table:
 - `Cnt`: number of measurement iterations used for the final score.
 
 Interpretation tip:
-- `MeshPipelineBenchmark.realtimePipeline` is an import/preprocess cost, not per-frame render cost.
+- `MeshPipelineBenchmark.realtimePipeline` is import/preprocess cost, not a frame-runtime metric.
 - Use `Pipelines.realtimeFast(...)` when source meshes are already clean and you want lower import latency.
 
 Perf gate:

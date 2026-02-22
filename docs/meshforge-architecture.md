@@ -2,7 +2,7 @@
 
 This split is intentional:
 - `MeshData` is optimized for flexibility and clarity.
-- `PackedMesh` is optimized for upload and rendering.
+- `PackedMesh` is optimized for compact immutable handoff.
 
 ## Representation 1: MeshData (Authoring Model)
 
@@ -96,11 +96,11 @@ Optional `Ops` façade exposes operation factories.
 ## Representation 2: PackedMesh (Runtime Model)
 
 ### PackedMesh responsibilities
-`PackedMesh` is optimized for rendering:
+`PackedMesh` is optimized for immutable downstream consumption:
 - immutable
 - layout-defined
 - buffer-backed (`ByteBuffer`/`MemorySegment`)
-- safe to share/cache across threads and renderers
+- safe to share/cache across threads and systems
 
 It contains:
 - one or more `VertexBufferView` streams

@@ -8,7 +8,7 @@ This document codifies ownership boundaries across:
 - `meshforge`: geometry processing and packing
 - `dynamislightengine`: rendering runtime and scene systems
 
-These rules are enforced to prevent coupling, duplicated logic, and renderer-specific leakage into MeshForge core.
+These rules are enforced to keep MeshForge a pure mesh manipulation library and to prevent renderer-specific leakage into MeshForge core.
 
 ## Allowed / Disallowed by Library
 
@@ -34,6 +34,7 @@ Allowed:
 - Mutable mesh authoring model (`MeshData`, schema, attributes)
 - Processing ops (`Ops`) such as weld/normals/tangents/cache/cluster/order
 - Immutable runtime geometry packaging (`PackedMesh`, meshlets, descriptor buffers)
+- Loader-side format ingestion/decode (including meshopt decode in `meshforge-loader`)
 - Dependency on Vectrix for math/packing helpers
 
 Disallowed in `meshforge/src/main`:
@@ -90,4 +91,3 @@ Disallowed:
   - Is math duplicated outside Vectrix?
   - Is mesh processing duplicated outside MeshForge?
   - Is renderer-specific logic introduced into MeshForge core?
-
