@@ -133,15 +133,19 @@ public final class MeshViewerApp extends Application {
 
             MeshView view = new MeshView(MeshFxBridge.toTriangleMesh(mesh));
             view.setMaterial(new PhongMaterial(Color.rgb(210, 218, 232)));
-            view.setCullFace(CullFace.BACK);
+            // Show both winding directions to reduce "invisible mesh" cases from mixed winding.
+            view.setCullFace(CullFace.NONE);
             view.setDrawMode(DrawMode.FILL);
             applyFraming(mesh, view);
 
             world.getChildren().setAll(view);
+            int indexCount = mesh.indicesOrNull() == null ? 0 : mesh.indicesOrNull().length;
+            int triangleCount = indexCount / 3;
             status.setText(file.getName() + " | vertices=" + mesh.vertexCount() +
-                " indices=" + (mesh.indicesOrNull() == null ? 0 : mesh.indicesOrNull().length));
+                " triangles=" + triangleCount + " indices=" + indexCount);
         } catch (Exception ex) {
-            status.setText("Load failed: " + ex.getMessage());
+            status.setText("Load failed: " + ex.getClass().getSimpleName() + ": " + ex.getMessage());
+            ex.printStackTrace(System.err);
         }
     }
 
