@@ -33,6 +33,10 @@ public final class Ops {
         return new OptimizeMeshletOrderOp(maxVertices, maxTriangles);
     }
 
+    public static MeshOp optimizeMeshletOrder() {
+        return optimizeMeshletOrder(128, 64);
+    }
+
     public static MeshOp bounds() {
         return new ComputeBoundsOp();
     }
