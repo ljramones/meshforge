@@ -43,10 +43,16 @@ public class MeshPackerBenchmark {
     }
 
     @Benchmark
+    public void packRealtimeOctaNormals(BenchState state, Blackhole bh) {
+        PackedMesh packed = MeshPacker.pack(state.richMesh, PackSpec.realtimeWithOctaNormals());
+        bh.consume(packed.layout().strideBytes());
+        bh.consume(packed.vertexBuffer().capacity());
+    }
+
+    @Benchmark
     public void packDebug(BenchState state, Blackhole bh) {
         PackedMesh packed = MeshPacker.pack(state.richMesh, PackSpec.debug());
         bh.consume(packed.layout().strideBytes());
         bh.consume(packed.vertexBuffer().capacity());
     }
 }
-
