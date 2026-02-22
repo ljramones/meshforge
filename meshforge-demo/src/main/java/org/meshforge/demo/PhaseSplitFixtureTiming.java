@@ -70,12 +70,12 @@ public final class PhaseSplitFixtureTiming {
             all.add(stats);
             System.out.printf(
                 Locale.ROOT,
-                "%-20s parse: %4d ms (p95 %4d) | pipeline: %4d ms (p95 %4d) | pack: %4d ms (p95 %4d) | total: %4d ms (p95 %4d)%n",
+                "%-20s parse: %12s (p95 %12s) | pipeline: %12s (p95 %12s) | pack: %12s (p95 %12s) | total: %12s (p95 %12s)%n",
                 stats.fixture() + ":",
-                stats.parseMedianMs(), stats.parseP95Ms(),
-                stats.pipelineMedianMs(), stats.pipelineP95Ms(),
-                stats.packMedianMs(), stats.packP95Ms(),
-                stats.totalMedianMs(), stats.totalP95Ms()
+                formatUs(stats.parseMedianUs()), formatUs(stats.parseP95Us()),
+                formatUs(stats.pipelineMedianUs()), formatUs(stats.pipelineP95Us()),
+                formatUs(stats.packMedianUs()), formatUs(stats.packP95Us()),
+                formatUs(stats.totalMedianUs()), formatUs(stats.totalP95Us())
             );
         }
 
@@ -88,10 +88,10 @@ public final class PhaseSplitFixtureTiming {
     }
 
     private static TimingStats runFixture(MeshLoaders loaders, Path fixture) throws IOException {
-        List<Long> parseMs = new ArrayList<>(TIMED_RUNS);
-        List<Long> pipelineMs = new ArrayList<>(TIMED_RUNS);
-        List<Long> packMs = new ArrayList<>(TIMED_RUNS);
-        List<Long> totalMs = new ArrayList<>(TIMED_RUNS);
+        List<Long> parseUs = new ArrayList<>(TIMED_RUNS);
+        List<Long> pipelineUs = new ArrayList<>(TIMED_RUNS);
+        List<Long> packUs = new ArrayList<>(TIMED_RUNS);
+        List<Long> totalUs = new ArrayList<>(TIMED_RUNS);
 
         for (int run = 0; run < WARMUP_RUNS + TIMED_RUNS; run++) {
             long t0 = System.nanoTime();
@@ -111,19 +111,19 @@ public final class PhaseSplitFixtureTiming {
             long totalNs = System.nanoTime() - t0;
 
             if (run >= WARMUP_RUNS) {
-                parseMs.add(parseNs / 1_000_000L);
-                pipelineMs.add(pipelineNs / 1_000_000L);
-                packMs.add(packNs / 1_000_000L);
-                totalMs.add(totalNs / 1_000_000L);
+                parseUs.add(parseNs / 1_000L);
+                pipelineUs.add(pipelineNs / 1_000L);
+                packUs.add(packNs / 1_000L);
+                totalUs.add(totalNs / 1_000L);
             }
         }
 
         return new TimingStats(
             fixture.getFileName().toString(),
-            median(parseMs), p95(parseMs),
-            median(pipelineMs), p95(pipelineMs),
-            median(packMs), p95(packMs),
-            median(totalMs), p95(totalMs)
+            median(parseUs), p95(parseUs),
+            median(pipelineUs), p95(pipelineUs),
+            median(packUs), p95(packUs),
+            median(totalUs), p95(totalUs)
         );
     }
 
@@ -142,31 +142,38 @@ public final class PhaseSplitFixtureTiming {
 
     private static void writeCsv(Path outFile, List<TimingStats> stats) throws IOException {
         StringBuilder sb = new StringBuilder();
-        sb.append("fixture,parse_median_ms,parse_p95_ms,pipeline_median_ms,pipeline_p95_ms,pack_median_ms,pack_p95_ms,total_median_ms,total_p95_ms\n");
+        sb.append("fixture,parse_median_us,parse_p95_us,pipeline_median_us,pipeline_p95_us,pack_median_us,pack_p95_us,total_median_us,total_p95_us\n");
         for (TimingStats s : stats) {
             sb.append(s.fixture()).append(',')
-                .append(s.parseMedianMs()).append(',')
-                .append(s.parseP95Ms()).append(',')
-                .append(s.pipelineMedianMs()).append(',')
-                .append(s.pipelineP95Ms()).append(',')
-                .append(s.packMedianMs()).append(',')
-                .append(s.packP95Ms()).append(',')
-                .append(s.totalMedianMs()).append(',')
-                .append(s.totalP95Ms()).append('\n');
+                .append(s.parseMedianUs()).append(',')
+                .append(s.parseP95Us()).append(',')
+                .append(s.pipelineMedianUs()).append(',')
+                .append(s.pipelineP95Us()).append(',')
+                .append(s.packMedianUs()).append(',')
+                .append(s.packP95Us()).append(',')
+                .append(s.totalMedianUs()).append(',')
+                .append(s.totalP95Us()).append('\n');
         }
         Files.writeString(outFile, sb.toString(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
     }
 
+    private static String formatUs(long us) {
+        if (us >= 1_000L) {
+            return String.format(Locale.ROOT, "%.3f ms", us / 1_000.0);
+        }
+        return us + " us";
+    }
+
     private record TimingStats(
         String fixture,
-        long parseMedianMs,
-        long parseP95Ms,
-        long pipelineMedianMs,
-        long pipelineP95Ms,
-        long packMedianMs,
-        long packP95Ms,
-        long totalMedianMs,
-        long totalP95Ms
+        long parseMedianUs,
+        long parseP95Us,
+        long pipelineMedianUs,
+        long pipelineP95Us,
+        long packMedianUs,
+        long packP95Us,
+        long totalMedianUs,
+        long totalP95Us
     ) {
     }
 }
