@@ -361,15 +361,15 @@ Snapshot (February 21, 2026, local machine run):
 
 | Fixture | Load ms (median) | Create ms (median) | Load ms / 1M verts | Create ms / 1M tris | Vertices | Triangles |
 |---|---:|---:|---:|---:|---:|---:|
-| `beast.obj` | 33.433 | 3.296 | 1034.713 | 51.010 | 32311 | 64618 |
-| `cow.obj` | 2.214 | 0.270 | 762.814 | 46.484 | 2903 | 5804 |
-| `lucy.obj` | 55.291 | 4.270 | 1106.115 | 42.709 | 49987 | 99970 |
-| `nefertiti.obj` | 47.096 | 4.083 | 942.463 | 40.856 | 49971 | 99938 |
-| `RevitHouse.obj` | 706.319 | 97.479 | 568.613 | 236.532 | 1242180 | 412119 |
-| `stanford-bunny.obj` | 28.315 | 3.169 | 787.685 | 45.632 | 35947 | 69451 |
-| `suzanne.obj` | 0.430 | 0.061 | 848.028 | 63.421 | 507 | 968 |
-| `teapot.obj` | 2.581 | 0.346 | 708.288 | 54.726 | 3644 | 6320 |
-| `xyzrgb_dragon.obj` | 141.936 | 10.697 | 1134.888 | 42.808 | 125066 | 249882 |
+| `beast.obj` | 6.453 | 3.834 | 199.707 | 59.333 | 32311 | 64618 |
+| `cow.obj` | 0.572 | 0.354 | 197.092 | 60.961 | 2903 | 5804 |
+| `lucy.obj` | 13.327 | 5.845 | 266.603 | 58.469 | 49987 | 99970 |
+| `nefertiti.obj` | 9.459 | 5.161 | 189.280 | 51.639 | 49971 | 99938 |
+| `RevitHouse.obj` | 183.373 | 93.068 | 147.622 | 225.828 | 1242180 | 412119 |
+| `stanford-bunny.obj` | 6.385 | 3.096 | 177.610 | 44.580 | 35947 | 69451 |
+| `suzanne.obj` | 0.114 | 0.052 | 224.178 | 53.857 | 507 | 968 |
+| `teapot.obj` | 0.613 | 0.324 | 168.306 | 51.323 | 3644 | 6320 |
+| `xyzrgb_dragon.obj` | 28.267 | 10.806 | 226.016 | 43.245 | 125066 | 249882 |
 
 These are fixture-level throughput indicators and will vary by CPU/JVM/load.
 
@@ -381,24 +381,30 @@ Command:
 
 ```bash
 mvn -pl meshforge-demo -DskipTests compile
-mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming exec:java
+mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--legacy" exec:java
+mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast" exec:java
 ```
 
 Latest snapshot (February 21, 2026, local machine run):
 
-| Fixture | Parse (median / p95) ms | Pipeline (median / p95) ms | Pack (median / p95) ms | Total (median / p95) ms |
-|---|---:|---:|---:|---:|
-| `beast.obj` | 42 / 58 | 0 / 0 | 2 / 4 | 47 / 63 |
-| `cow.obj` | 2 / 2 | 0 / 0 | 0 / 0 | 2 / 2 |
-| `lucy.obj` | 56 / 58 | 0 / 0 | 3 / 3 | 60 / 63 |
-| `nefertiti.obj` | 48 / 49 | 0 / 0 | 3 / 3 | 52 / 53 |
-| `RevitHouse.obj` | 697 / 730 | 6 / 46 | 89 / 116 | 811 / 854 |
-| `stanford-bunny.obj` | 28 / 30 | 0 / 0 | 2 / 2 | 31 / 33 |
-| `suzanne.obj` | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 |
-| `teapot.obj` | 2 / 2 | 0 / 0 | 0 / 0 | 2 / 2 |
-| `xyzrgb_dragon.obj` | 147 / 190 | 1 / 2 | 8 / 12 | 158 / 205 |
+| Fixture | Legacy Total (median / p95) ms | Fast Total (median / p95) ms | Speedup |
+|---|---:|---:|---:|
+| `beast.obj` | 48 / 50 | 10 / 16 | 4.80x |
+| `cow.obj` | 2 / 3 | 0 / 1 | ~2x+ |
+| `lucy.obj` | 62 / 76 | 19 / 19 | 3.26x |
+| `nefertiti.obj` | 53 / 57 | 15 / 16 | 3.53x |
+| `RevitHouse.obj` | 830 / 863 | 267 / 284 | 3.11x |
+| `stanford-bunny.obj` | 32 / 32 | 9 / 9 | 3.56x |
+| `suzanne.obj` | 0 / 0 | 0 / 0 | n/a |
+| `teapot.obj` | 2 / 3 | 0 / 1 | ~2x+ |
+| `xyzrgb_dragon.obj` | 170 / 204 | 38 / 41 | 4.47x |
 
-CSV output is written to `perf/results/phase-split-<timestamp>.csv`.
+Fast-loader parse phase examples (`--fast`):
+- `RevitHouse.obj`: parse `180 / 183 ms` (from legacy `729 / 737 ms`)
+- `xyzrgb_dragon.obj`: parse `28 / 28 ms` (from legacy `160 / 190 ms`)
+- `lucy.obj`: parse `13 / 13 ms` (from legacy `58 / 70 ms`)
+
+CSV outputs are written to `perf/results/phase-split-legacy-<timestamp>.csv` and `perf/results/phase-split-fast-<timestamp>.csv`.
 For very small fixtures, millisecond rounding can show `0 ms`; use larger iteration counts if you need finer phase resolution.
 
 ---

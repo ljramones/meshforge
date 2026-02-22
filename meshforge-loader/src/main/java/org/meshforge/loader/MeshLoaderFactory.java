@@ -16,6 +16,10 @@ public final class MeshLoaderFactory {
         return ObjMeshLoader::load;
     }
 
+    public static MeshFileLoader objFast() {
+        return FastObjMeshLoader::load;
+    }
+
     public static MeshFileLoader stl() {
         return StlMeshLoader::load;
     }

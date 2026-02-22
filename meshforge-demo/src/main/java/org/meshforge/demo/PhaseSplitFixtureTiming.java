@@ -30,6 +30,15 @@ public final class PhaseSplitFixtureTiming {
     }
 
     public static void main(String[] args) throws Exception {
+        boolean fastLoader = true;
+        for (String arg : args) {
+            if ("--legacy".equals(arg)) {
+                fastLoader = false;
+            } else if ("--fast".equals(arg)) {
+                fastLoader = true;
+            }
+        }
+
         Path fixturesDir = Path.of("fixtures", "baseline");
         if (!Files.isDirectory(fixturesDir)) {
             System.out.println("Missing baseline fixtures directory: " + fixturesDir.toAbsolutePath());
@@ -47,11 +56,13 @@ public final class PhaseSplitFixtureTiming {
             return;
         }
 
-        MeshLoaders loaders = MeshLoaders.defaults();
+        MeshLoaders loaders = fastLoader ? MeshLoaders.defaultsFast() : MeshLoaders.defaultsLegacy();
         List<TimingStats> all = new ArrayList<>();
 
         System.out.println(
-            "Phase-split timing (median + p95 over " + TIMED_RUNS + " timed runs after " + WARMUP_RUNS + " warmup runs)"
+            "Phase-split timing (" + (fastLoader ? "fast" : "legacy") +
+                " loader, median + p95 over " + TIMED_RUNS +
+                " timed runs after " + WARMUP_RUNS + " warmup runs)"
         );
         System.out.println();
         for (Path fixture : fixtures) {
@@ -70,7 +81,7 @@ public final class PhaseSplitFixtureTiming {
 
         Path outDir = Path.of("perf", "results");
         Files.createDirectories(outDir);
-        Path outFile = outDir.resolve("phase-split-" + LocalDateTime.now().format(TS) + ".csv");
+        Path outFile = outDir.resolve("phase-split-" + (fastLoader ? "fast" : "legacy") + "-" + LocalDateTime.now().format(TS) + ".csv");
         writeCsv(outFile, all);
         System.out.println();
         System.out.println("Results written to: " + outFile.toAbsolutePath());

@@ -20,11 +20,30 @@ public final class MeshLoaders {
 
     public static MeshLoaders defaults() {
         Builder builder = builder();
+        builder.register("obj", MeshLoaderFactory.objFast());
+        builder.register("stl", MeshLoaderFactory.stl());
+        builder.register("ply", MeshLoaderFactory.ply());
+        builder.register("off", MeshLoaderFactory.off());
+        return builder.build();
+    }
+
+    /**
+     * Legacy defaults using the original line-based OBJ parser.
+     */
+    public static MeshLoaders defaultsLegacy() {
+        Builder builder = builder();
         builder.register("obj", MeshLoaderFactory.obj());
         builder.register("stl", MeshLoaderFactory.stl());
         builder.register("ply", MeshLoaderFactory.ply());
         builder.register("off", MeshLoaderFactory.off());
         return builder.build();
+    }
+
+    /**
+     * Alias for defaults() to make loader choice explicit in benchmark and tooling code.
+     */
+    public static MeshLoaders defaultsFast() {
+        return defaults();
     }
 
     /**

@@ -54,6 +54,21 @@ class MeshLoadersTest {
         assertEquals(3, mesh.indicesOrNull().length);
     }
 
+    @Test
+    void defaultsFastDispatchesObjFastLoader(@TempDir Path tempDir) throws Exception {
+        Path file = tempDir.resolve("simple.obj");
+        Files.writeString(file, """
+            v 0 0 0
+            v 1 0 0
+            v 0 1 0
+            f 1 2 3
+            """, StandardCharsets.US_ASCII);
+
+        var mesh = MeshLoaders.defaultsFast().load(file);
+        assertEquals(3, mesh.vertexCount());
+        assertEquals(3, mesh.indicesOrNull().length);
+    }
+
     private static byte[] binaryTriangleStl() {
         byte[] bytes = new byte[84 + 50];
         byte[] header = "meshforge-binary-stl".getBytes(StandardCharsets.US_ASCII);
