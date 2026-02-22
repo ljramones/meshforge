@@ -405,6 +405,20 @@ Key observations:
 - Pack is now the clear #2 target on large assets.
 - Pipeline remains negligible for realtime import paths.
 
+Legacy vs fast total-time deltas (same fixture set):
+
+| Fixture | Legacy Total (median / p95) | Fast Total (median / p95) | Speedup |
+|---|---:|---:|---:|
+| `beast.obj` | 48 ms / 50 ms | 10.319 ms / 16.642 ms | 4.65x |
+| `cow.obj` | 2 ms / 3 ms | 850 us / 897 us | 2.35x |
+| `lucy.obj` | 62 ms / 76 ms | 18.407 ms / 18.513 ms | 3.37x |
+| `nefertiti.obj` | 53 ms / 57 ms | 15.052 ms / 15.288 ms | 3.52x |
+| `RevitHouse.obj` | 830 ms / 863 ms | 261.824 ms / 294.401 ms | 3.17x |
+| `stanford-bunny.obj` | 32 ms / 32 ms | 9.157 ms / 9.225 ms | 3.50x |
+| `suzanne.obj` | 0 ms / 0 ms | 175 us / 217 us | n/a (legacy rounded to 0 ms) |
+| `teapot.obj` | 2 ms / 3 ms | 918 us / 954 us | 2.18x |
+| `xyzrgb_dragon.obj` | 170 ms / 204 ms | 37.388 ms / 39.379 ms | 4.55x |
+
 CSV outputs are written to `perf/results/phase-split-legacy-<timestamp>.csv` and `perf/results/phase-split-fast-<timestamp>.csv`.
 For very small fixtures, millisecond rounding can show `0 ms`; use larger iteration counts if you need finer phase resolution.
 
