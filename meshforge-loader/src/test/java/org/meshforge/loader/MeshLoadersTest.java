@@ -43,7 +43,23 @@ class MeshLoadersTest {
         Files.writeString(file, """
             {
               "asset": {"version":"2.0"},
-              "extensionsUsed": ["KHR_meshopt_compression"]
+              "buffers": [],
+              "bufferViews": [{
+                "byteLength": 12,
+                "extensions": {
+                  "KHR_meshopt_compression": {
+                    "buffer": 0,
+                    "byteOffset": 0,
+                    "byteLength": 12,
+                    "byteStride": 12,
+                    "count": 1,
+                    "mode": "ATTRIBUTES",
+                    "filter": "NONE"
+                  }
+                }
+              }],
+              "accessors": [{"bufferView": 0, "componentType": 5126, "count": 1, "type": "VEC3"}],
+              "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}]
             }
             """, StandardCharsets.UTF_8);
 
@@ -54,7 +70,7 @@ class MeshLoadersTest {
 
         MeshLoadOptions enabled = MeshLoadOptions.builder().meshoptDecodeEnabled(true).build();
         IOException enabledEx = assertThrows(IOException.class, () -> loaders.load(file, enabled));
-        assertTrue(enabledEx.getMessage().contains("meshopt decode hook is enabled"));
+        assertTrue(enabledEx.getMessage().contains("buffer index out of range"));
     }
 
     @Test
@@ -68,7 +84,7 @@ class MeshLoadersTest {
 
         MeshLoaders loaders = MeshLoaders.planned();
         IOException ex = assertThrows(IOException.class, () -> loaders.load(file, MeshLoadOptions.defaults()));
-        assertTrue(ex.getMessage().contains("not implemented yet"));
+        assertTrue(ex.getMessage().contains("buffers"));
     }
 
     @Test
