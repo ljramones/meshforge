@@ -107,16 +107,20 @@ public final class MeshViewerApp extends Application {
 
     private SubScene createViewport() {
         Group root3d = new Group(world);
-        AmbientLight ambient = new AmbientLight(Color.color(0.75, 0.75, 0.78));
+        AmbientLight ambient = new AmbientLight(Color.color(0.28, 0.30, 0.34));
         PointLight key = new PointLight(Color.color(1.0, 1.0, 1.0));
         key.setTranslateX(-8.0);
         key.setTranslateY(-6.0);
         key.setTranslateZ(-8.0);
-        PointLight fill = new PointLight(Color.color(0.75, 0.78, 0.85));
-        fill.setTranslateX(8.0);
-        fill.setTranslateY(2.0);
-        fill.setTranslateZ(-4.0);
-        root3d.getChildren().addAll(ambient, key, fill);
+        PointLight fill = new PointLight(Color.color(0.38, 0.42, 0.50));
+        fill.setTranslateX(10.0);
+        fill.setTranslateY(4.0);
+        fill.setTranslateZ(-3.0);
+        PointLight rim = new PointLight(Color.color(0.22, 0.24, 0.30));
+        rim.setTranslateX(0.0);
+        rim.setTranslateY(-4.0);
+        rim.setTranslateZ(10.0);
+        root3d.getChildren().addAll(ambient, key, fill, rim);
 
         SubScene sub = new SubScene(root3d, 1000, 700, true, null);
         sub.setFill(Color.rgb(28, 31, 38));
@@ -206,9 +210,9 @@ public final class MeshViewerApp extends Application {
             Group meshGroup = new Group();
             for (var fxMesh : fxMeshes) {
                 MeshView view = new MeshView(fxMesh);
-                PhongMaterial material = new PhongMaterial(Color.rgb(214, 223, 236));
-                material.setSpecularColor(Color.rgb(90, 98, 110));
-                material.setSpecularPower(8.0);
+                PhongMaterial material = new PhongMaterial(Color.rgb(178, 188, 202));
+                material.setSpecularColor(Color.rgb(64, 70, 80));
+                material.setSpecularPower(24.0);
                 view.setMaterial(material);
                 // Show both winding directions to reduce "invisible mesh" cases from mixed winding.
                 view.setCullFace(CullFace.NONE);
