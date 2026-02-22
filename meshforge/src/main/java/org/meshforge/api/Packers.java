@@ -21,4 +21,8 @@ public final class Packers {
     public static PackSpec debug() {
         return PackSpec.debug();
     }
+
+    public static PackSpec realtimeMinimal() {
+        return PackSpec.realtimeMinimal();
+    }
 }

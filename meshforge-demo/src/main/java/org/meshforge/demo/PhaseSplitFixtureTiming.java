@@ -5,6 +5,7 @@ import org.meshforge.api.Pipelines;
 import org.meshforge.core.mesh.MeshData;
 import org.meshforge.loader.MeshLoaders;
 import org.meshforge.pack.packer.MeshPacker;
+import org.meshforge.pack.spec.PackSpec;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -31,12 +32,26 @@ public final class PhaseSplitFixtureTiming {
 
     public static void main(String[] args) throws Exception {
         boolean fastLoader = true;
+        boolean profilePack = false;
+        boolean packMinimal = false;
+        String fixtureFilter = null;
         for (String arg : args) {
             if ("--legacy".equals(arg)) {
                 fastLoader = false;
             } else if ("--fast".equals(arg)) {
                 fastLoader = true;
+            } else if ("--profile-pack".equals(arg)) {
+                profilePack = true;
+            } else if ("--pack-minimal".equals(arg)) {
+                packMinimal = true;
+            } else if (arg.startsWith("--fixture=")) {
+                fixtureFilter = arg.substring("--fixture=".length()).trim().toLowerCase(Locale.ROOT);
             }
+        }
+
+        if (profilePack) {
+            PackBreakdownFixtureTiming.main(args);
+            return;
         }
 
         Path fixturesDir = Path.of("fixtures", "baseline");
@@ -45,9 +60,11 @@ public final class PhaseSplitFixtureTiming {
             return;
         }
 
+        final String fixtureFilterValue = fixtureFilter;
         List<Path> fixtures = Files.list(fixturesDir)
             .filter(Files::isRegularFile)
             .filter(p -> p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".obj"))
+            .filter(p -> fixtureFilterValue == null || p.getFileName().toString().toLowerCase(Locale.ROOT).contains(fixtureFilterValue))
             .sorted(Comparator.comparing(p -> p.getFileName().toString().toLowerCase(Locale.ROOT)))
             .toList();
 
@@ -61,12 +78,13 @@ public final class PhaseSplitFixtureTiming {
 
         System.out.println(
             "Phase-split timing (" + (fastLoader ? "fast" : "legacy") +
-                " loader, median + p95 over " + TIMED_RUNS +
+                ", " + (packMinimal ? "minimal" : "realtime") + " pack spec" +
+                ", median + p95 over " + TIMED_RUNS +
                 " timed runs after " + WARMUP_RUNS + " warmup runs)"
         );
         System.out.println();
         for (Path fixture : fixtures) {
-            TimingStats stats = runFixture(loaders, fixture);
+            TimingStats stats = runFixture(loaders, fixture, packMinimal);
             all.add(stats);
             System.out.printf(
                 Locale.ROOT,
@@ -87,7 +105,8 @@ public final class PhaseSplitFixtureTiming {
         System.out.println("Results written to: " + outFile.toAbsolutePath());
     }
 
-    private static TimingStats runFixture(MeshLoaders loaders, Path fixture) throws IOException {
+    private static TimingStats runFixture(MeshLoaders loaders, Path fixture, boolean packMinimal) throws IOException {
+        PackSpec packSpec = packMinimal ? Packers.realtimeMinimal() : Packers.realtime();
         List<Long> parseUs = new ArrayList<>(TIMED_RUNS);
         List<Long> pipelineUs = new ArrayList<>(TIMED_RUNS);
         List<Long> packUs = new ArrayList<>(TIMED_RUNS);
@@ -105,7 +124,7 @@ public final class PhaseSplitFixtureTiming {
             long pipelineNs = System.nanoTime() - to;
 
             long tk = System.nanoTime();
-            MeshPacker.pack(processed, Packers.realtime());
+            MeshPacker.pack(processed, packSpec);
             long packNs = System.nanoTime() - tk;
 
             long totalNs = System.nanoTime() - t0;

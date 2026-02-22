@@ -281,7 +281,7 @@ See `docs/mesh-fixtures.md` for sample asset sources and local fixture setup.
 
 # Benchmark Snapshot
 
-Command run outside sandbox on February 21, 2026:
+Command run outside sandbox on February 22, 2026:
 
 ```bash
 ./scripts/run-jmh.sh
@@ -300,23 +300,23 @@ Reliable forked runner script (uses direct `java -cp ...` and works outside sand
 JMH_FILTER='.*MeshPackerBenchmark.*' JMH_FORKS=2 ./scripts/run-jmh.sh
 ```
 
-Results (JMH `avgt`, forked, `Cnt=20`):
+Results (JMH `avgt`, forked, `Cnt=5`):
 
 | Benchmark | Units | Score | Error | Cnt |
 |---|---|---:|---:|---:|
-| `MeshOpsBenchmark.computeBounds` | `ms/op` | 0.110 | ±0.001 | 20 |
-| `MeshOpsBenchmark.optimizeVertexCache` | `ms/op` | 293.849 | ±4.544 | 20 |
-| `MeshOpsBenchmark.recalculateNormals` | `ms/op` | 0.501 | ±0.007 | 20 |
-| `MeshOpsBenchmark.recalculateTangents` | `ms/op` | 1.111 | ±0.003 | 20 |
-| `MeshOpsBenchmark.removeDegenerates` | `ms/op` | 0.312 | ±0.015 | 20 |
-| `MeshOpsBenchmark.validate` | `ms/op` | 0.073 | ±0.003 | 20 |
-| `MeshOpsBenchmark.weld` | `ms/op` | 3.372 | ±0.064 | 20 |
-| `MeshPackerBenchmark.packDebug` | `ms/op` | 7.210 | ±0.643 | 20 |
-| `MeshPackerBenchmark.packRealtime` | `ms/op` | 7.394 | ±0.739 | 20 |
-| `MeshPipelineBenchmark.realtimePipeline` | `ms/op` | 165.614 | ±1.540 | 20 |
-| `OptimizeVertexCacheBenchmark.optimizeAndMeasureAcmr` | `ms/op` | 302.115 | ±4.410 | 20 |
+| `MeshOpsBenchmark.computeBounds` | `ms/op` | 0.111 | ±0.002 | 5 |
+| `MeshOpsBenchmark.optimizeVertexCache` | `ms/op` | 305.508 | ±28.529 | 5 |
+| `MeshOpsBenchmark.recalculateNormals` | `ms/op` | 0.519 | ±0.028 | 5 |
+| `MeshOpsBenchmark.recalculateTangents` | `ms/op` | 1.115 | ±0.013 | 5 |
+| `MeshOpsBenchmark.removeDegenerates` | `ms/op` | 0.316 | ±0.071 | 5 |
+| `MeshOpsBenchmark.validate` | `ms/op` | 0.076 | ±0.012 | 5 |
+| `MeshOpsBenchmark.weld` | `ms/op` | 3.454 | ±0.068 | 5 |
+| `MeshPackerBenchmark.packDebug` | `ms/op` | 1.152 | ±0.034 | 5 |
+| `MeshPackerBenchmark.packRealtime` | `ms/op` | 1.021 | ±0.040 | 5 |
+| `MeshPipelineBenchmark.realtimePipeline` | `ms/op` | 168.763 | ±5.911 | 5 |
+| `OptimizeVertexCacheBenchmark.optimizeAndMeasureAcmr` | `ms/op` | 304.540 | ±9.173 | 5 |
 
-Focused packer-only run (`JMH_FILTER='.*MeshPackerBenchmark.*'`, `-f 3 -wi 8 -i 15 -prof gc`) produced a stable `packRealtime` of `5.356 ± 0.015 ms/op`.
+Focused packer-only run (`JMH_FILTER='.*MeshPackerBenchmark.*'`, `-f 3 -wi 8 -i 15 -prof gc`) previously produced a stable `packRealtime` of `5.356 ± 0.015 ms/op` before hot-path pack specialization.
 
 Notes:
 - For publishable/perf-regression baselines, run outside sandbox with forks (`JMH_FORKS>=1`).
@@ -357,19 +357,19 @@ Definitions:
 - `Load ms / 1M verts`: normalized loader cost by vertex count
 - `Create ms / 1M tris`: normalized creation cost by triangle count
 
-Snapshot (February 21, 2026, local machine run):
+Snapshot (February 22, 2026, local machine run):
 
 | Fixture | Load ms (median) | Create ms (median) | Load ms / 1M verts | Create ms / 1M tris | Vertices | Triangles |
 |---|---:|---:|---:|---:|---:|---:|
-| `beast.obj` | 6.453 | 3.834 | 199.707 | 59.333 | 32311 | 64618 |
-| `cow.obj` | 0.572 | 0.354 | 197.092 | 60.961 | 2903 | 5804 |
-| `lucy.obj` | 13.327 | 5.845 | 266.603 | 58.469 | 49987 | 99970 |
-| `nefertiti.obj` | 9.459 | 5.161 | 189.280 | 51.639 | 49971 | 99938 |
-| `RevitHouse.obj` | 183.373 | 93.068 | 147.622 | 225.828 | 1242180 | 412119 |
-| `stanford-bunny.obj` | 6.385 | 3.096 | 177.610 | 44.580 | 35947 | 69451 |
-| `suzanne.obj` | 0.114 | 0.052 | 224.178 | 53.857 | 507 | 968 |
-| `teapot.obj` | 0.613 | 0.324 | 168.306 | 51.323 | 3644 | 6320 |
-| `xyzrgb_dragon.obj` | 28.267 | 10.806 | 226.016 | 43.245 | 125066 | 249882 |
+| `beast.obj` | 3.340 | 0.881 | 103.370 | 13.634 | 32311 | 64618 |
+| `cow.obj` | 0.293 | 0.076 | 100.939 | 13.046 | 2903 | 5804 |
+| `lucy.obj` | 6.046 | 1.381 | 120.961 | 13.810 | 49987 | 99970 |
+| `nefertiti.obj` | 5.420 | 1.111 | 108.463 | 11.114 | 49971 | 99938 |
+| `RevitHouse.obj` | 70.450 | 10.547 | 56.715 | 25.592 | 1242180 | 412119 |
+| `stanford-bunny.obj` | 3.302 | 0.833 | 91.870 | 11.992 | 35947 | 69451 |
+| `suzanne.obj` | 0.065 | 0.022 | 128.944 | 22.701 | 507 | 968 |
+| `teapot.obj` | 0.303 | 0.078 | 83.054 | 12.367 | 3644 | 6320 |
+| `xyzrgb_dragon.obj` | 15.200 | 3.090 | 121.540 | 12.367 | 125066 | 249882 |
 
 These are fixture-level throughput indicators and will vary by CPU/JVM/load.
 
@@ -383,41 +383,84 @@ Command:
 mvn -pl meshforge-demo -DskipTests compile
 mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--legacy" exec:java
 mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast" exec:java
+mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast --pack-minimal" exec:java
 ```
 
-Latest fast-loader snapshot (February 21, 2026, local machine run):
+Latest fast-loader snapshot (February 22, 2026, local machine run):
 
 | Fixture | Parse (median / p95) | Pipeline (median / p95) | Pack (median / p95) | Total (median / p95) |
 |---|---:|---:|---:|---:|
-| `beast.obj` | 6.278 ms / 11.481 ms | 501 us / 689 us | 3.568 ms / 4.472 ms | 10.319 ms / 16.642 ms |
-| `cow.obj` | 523 us / 573 us | 48 us / 83 us | 270 us / 307 us | 850 us / 897 us |
-| `lucy.obj` | 12.770 ms / 12.879 ms | 711 us / 727 us | 4.906 ms / 5.022 ms | 18.407 ms / 18.513 ms |
-| `nefertiti.obj` | 9.589 ms / 9.976 ms | 731 us / 776 us | 4.704 ms / 4.768 ms | 15.052 ms / 15.288 ms |
-| `RevitHouse.obj` | 172.474 ms / 176.933 ms | 6.040 ms / 6.967 ms | 81.114 ms / 111.144 ms | 261.824 ms / 294.401 ms |
-| `stanford-bunny.obj` | 6.173 ms / 6.309 ms | 538 us / 555 us | 2.431 ms / 2.487 ms | 9.157 ms / 9.225 ms |
-| `suzanne.obj` | 121 us / 143 us | 9 us / 23 us | 42 us / 50 us | 175 us / 217 us |
-| `teapot.obj` | 626 us / 647 us | 48 us / 48 us | 243 us / 259 us | 918 us / 954 us |
-| `xyzrgb_dragon.obj` | 27.565 ms / 29.736 ms | 1.733 ms / 1.772 ms | 8.050 ms / 8.512 ms | 37.388 ms / 39.379 ms |
+| `beast.obj` | 3.366 ms / 9.885 ms | 550 us / 642 us | 464 us / 895 us | 4.411 ms / 10.910 ms |
+| `cow.obj` | 300 us / 337 us | 56 us / 66 us | 73 us / 110 us | 430 us / 504 us |
+| `lucy.obj` | 6.074 ms / 6.117 ms | 752 us / 763 us | 595 us / 663 us | 7.447 ms / 7.479 ms |
+| `nefertiti.obj` | 5.368 ms / 5.638 ms | 750 us / 827 us | 357 us / 449 us | 6.499 ms / 6.806 ms |
+| `RevitHouse.obj` | 73.431 ms / 76.959 ms | 7.732 ms / 7.952 ms | 5.199 ms / 5.854 ms | 87.089 ms / 89.072 ms |
+| `stanford-bunny.obj` | 3.219 ms / 3.279 ms | 569 us / 594 us | 184 us / 207 us | 3.976 ms / 4.034 ms |
+| `suzanne.obj` | 70 us / 82 us | 9 us / 25 us | 8 us / 17 us | 85 us / 125 us |
+| `teapot.obj` | 292 us / 305 us | 53 us / 61 us | 23 us / 70 us | 380 us / 414 us |
+| `xyzrgb_dragon.obj` | 14.527 ms / 15.664 ms | 1.889 ms / 2.110 ms | 1.079 ms / 1.909 ms | 17.362 ms / 18.697 ms |
 
 Key observations:
-- Fast OBJ parsing delivered ~3-5x speedup vs legacy on large fixtures.
-- Parse remains the largest contributor on large assets (~66-74% of total).
-- Pack is now the clear #2 target on large assets.
-- Pipeline remains negligible for realtime import paths.
+- Specialized hot loops in `MeshPacker` reduced pack costs dramatically across fixtures.
+- RevitHouse total is now ~87 ms median with pack around ~5 ms.
+- Parse is the dominant stage; pipeline and pack are secondary.
 
 Legacy vs fast total-time deltas (same fixture set):
 
 | Fixture | Legacy Total (median / p95) | Fast Total (median / p95) | Speedup |
 |---|---:|---:|---:|
-| `beast.obj` | 48 ms / 50 ms | 10.319 ms / 16.642 ms | 4.65x |
-| `cow.obj` | 2 ms / 3 ms | 850 us / 897 us | 2.35x |
-| `lucy.obj` | 62 ms / 76 ms | 18.407 ms / 18.513 ms | 3.37x |
-| `nefertiti.obj` | 53 ms / 57 ms | 15.052 ms / 15.288 ms | 3.52x |
-| `RevitHouse.obj` | 830 ms / 863 ms | 261.824 ms / 294.401 ms | 3.17x |
-| `stanford-bunny.obj` | 32 ms / 32 ms | 9.157 ms / 9.225 ms | 3.50x |
-| `suzanne.obj` | 0 ms / 0 ms | 175 us / 217 us | n/a (legacy rounded to 0 ms) |
-| `teapot.obj` | 2 ms / 3 ms | 918 us / 954 us | 2.18x |
-| `xyzrgb_dragon.obj` | 170 ms / 204 ms | 37.388 ms / 39.379 ms | 4.55x |
+| `beast.obj` | 48 ms / 50 ms | 7.561 ms / 14.475 ms | 6.35x |
+| `cow.obj` | 2 ms / 3 ms | 821 us / 980 us | 2.44x |
+| `lucy.obj` | 62 ms / 76 ms | 11.847 ms / 12.372 ms | 5.23x |
+| `nefertiti.obj` | 53 ms / 57 ms | 10.927 ms / 10.989 ms | 4.85x |
+| `RevitHouse.obj` | 830 ms / 863 ms | 161.092 ms / 173.931 ms | 5.15x |
+| `stanford-bunny.obj` | 32 ms / 32 ms | 6.177 ms / 6.251 ms | 5.18x |
+| `suzanne.obj` | 0 ms / 0 ms | 132 us / 169 us | n/a (legacy rounded to 0 ms) |
+| `teapot.obj` | 2 ms / 3 ms | 616 us / 647 us | 3.25x |
+| `xyzrgb_dragon.obj` | 170 ms / 204 ms | 24.308 ms / 26.528 ms | 6.99x |
+
+### Pack Breakdown Timings
+
+Isolate `MeshPacker.pack(..., Packers.realtime())` and capture sub-phases:
+- resolve attributes
+- layout/stride computation
+- vertex write loop
+- index packing
+- submesh copy/finalization
+
+Command:
+
+```bash
+mvn -pl meshforge-demo -DskipTests compile
+mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PackBreakdownFixtureTiming -Dexec.args="--fast" exec:java
+mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PackBreakdownFixtureTiming -Dexec.args="--fast --pack-minimal" exec:java
+```
+
+Shortcut from phase-split runner:
+
+```bash
+mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast --profile-pack" exec:java
+```
+
+CSV output is written to `perf/results/pack-breakdown-*.csv` with per-fixture medians/p95 and normalized totals.
+`--pack-minimal` uses `Packers.realtimeMinimal()` (position-only pack target) for quick deltas.
+
+Latest pack-breakdown snapshot (`--fast`, realtime spec, February 21, 2026):
+
+| Fixture | Pack Total (median / p95) | Vertex (median) | Position (median) | Normal (median) | Index (median) |
+|---|---:|---:|---:|---:|---:|
+| `beast.obj` | 5.583 ms / 5.839 ms | 5.469 ms | 358 us | 534 us | 118 us |
+| `cow.obj` | 499 us / 718 us | 488 us | 31 us | 46 us | 9 us |
+| `lucy.obj` | 6.615 ms / 6.755 ms | 6.445 ms | 466 us | 659 us | 160 us |
+| `nefertiti.obj` | 6.530 ms / 6.714 ms | 6.348 ms | 310 us | 626 us | 177 us |
+| `RevitHouse.obj` | 118.597 ms / 150.391 ms | 118.179 ms | 8.785 ms | 16.045 ms | 431 us |
+| `stanford-bunny.obj` | 3.738 ms / 8.596 ms | 3.615 ms | 434 us | 521 us | 113 us |
+| `suzanne.obj` | 65 us / 84 us | 57 us | 7 us | 8 us | 3 us |
+| `teapot.obj` | 407 us / 519 us | 396 us | 40 us | 52 us | 9 us |
+| `xyzrgb_dragon.obj` | 12.190 ms / 12.361 ms | 11.732 ms | 784 us | 1.469 ms | 416 us |
+
+The current pack hotspot is the vertex write/format conversion loop; layout/resolve/submesh are effectively noise at this scale.
+Note: sub-phase mode includes per-section instrumentation (`System.nanoTime`) and is intended for hotspot ranking, not absolute cross-mode throughput comparison.
 
 CSV outputs are written to `perf/results/phase-split-legacy-<timestamp>.csv` and `perf/results/phase-split-fast-<timestamp>.csv`.
 For very small fixtures, millisecond rounding can show `0 ms`; use larger iteration counts if you need finer phase resolution.

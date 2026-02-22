@@ -121,6 +121,23 @@ public final class PackSpec {
         return realtime();
     }
 
+    /**
+     * Minimal runtime pack preset.
+     * Position-only output for quick-load or tooling scenarios.
+     */
+    public static PackSpec realtimeMinimal() {
+        return builder()
+            .layout(LayoutMode.INTERLEAVED)
+            .alignment(16)
+            .indexPolicy(IndexPolicy.AUTO_16_IF_POSSIBLE)
+            .target(AttributeSemantic.POSITION, 0, VertexFormat.F32x3)
+            .dropUnknownAttributes(true)
+            .computeBoundsIfMissing(true)
+            .failIfMissingNormals(false)
+            .failIfMissingTangents(false)
+            .build();
+    }
+
     public static final class Builder {
         private LayoutMode layoutMode = LayoutMode.INTERLEAVED;
         private int alignmentBytes = 16;

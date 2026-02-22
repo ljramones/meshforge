@@ -124,6 +124,11 @@ Current benchmark classes:
 - `org.meshforge.bench.MeshOpsBenchmark`
 - `org.meshforge.bench.MeshSizeScalingBenchmark`
 
+Demo fixture profilers:
+- `org.meshforge.demo.BaselineFixtureTiming` (load/create medians + normalized throughput)
+- `org.meshforge.demo.PhaseSplitFixtureTiming` (parse/pipeline/pack/total median+p95)
+- `org.meshforge.demo.PackBreakdownFixtureTiming` (pack sub-phase median+p95)
+
 Per-op hotspot pass:
 
 ```bash
@@ -145,3 +150,40 @@ mvn -pl meshforge -Pbench test-compile exec:java -Djmh.filter='.*MeshSizeScaling
 - heap candidate selection + score lookup tables + push gating: ~294-302 ms/op
 
 Use this as a directional performance guardrail; exact values vary by machine/JVM.
+
+## Fixture Pack Breakdown
+
+Run outside sandbox from repo root:
+
+```bash
+mvn -pl meshforge-demo -DskipTests compile
+mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PackBreakdownFixtureTiming -Dexec.args="--fast" exec:java
+mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PackBreakdownFixtureTiming -Dexec.args="--fast --pack-minimal" exec:java
+```
+
+Shortcut via phase-split runner:
+
+```bash
+mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast --profile-pack" exec:java
+```
+
+Outputs CSV to `perf/results/pack-breakdown-*.csv`.
+Use `--pack-minimal` to switch to `Packers.realtimeMinimal()` for quick attribute-cost deltas.
+
+## Latest Phase-Split Snapshot (Fast)
+
+Source: `perf/results/phase-split-fast-20260221-215917.csv` (local machine run, Feb 22, 2026).
+
+| Fixture | Parse (median / p95) | Pipeline (median / p95) | Pack (median / p95) | Total (median / p95) |
+|---|---:|---:|---:|---:|
+| `beast.obj` | 3.366 ms / 9.885 ms | 550 us / 642 us | 464 us / 895 us | 4.411 ms / 10.910 ms |
+| `cow.obj` | 300 us / 337 us | 56 us / 66 us | 73 us / 110 us | 430 us / 504 us |
+| `lucy.obj` | 6.074 ms / 6.117 ms | 752 us / 763 us | 595 us / 663 us | 7.447 ms / 7.479 ms |
+| `nefertiti.obj` | 5.368 ms / 5.638 ms | 750 us / 827 us | 357 us / 449 us | 6.499 ms / 6.806 ms |
+| `RevitHouse.obj` | 73.431 ms / 76.959 ms | 7.732 ms / 7.952 ms | 5.199 ms / 5.854 ms | 87.089 ms / 89.072 ms |
+| `stanford-bunny.obj` | 3.219 ms / 3.279 ms | 569 us / 594 us | 184 us / 207 us | 3.976 ms / 4.034 ms |
+| `suzanne.obj` | 70 us / 82 us | 9 us / 25 us | 8 us / 17 us | 85 us / 125 us |
+| `teapot.obj` | 292 us / 305 us | 53 us / 61 us | 23 us / 70 us | 380 us / 414 us |
+| `xyzrgb_dragon.obj` | 14.527 ms / 15.664 ms | 1.889 ms / 2.110 ms | 1.079 ms / 1.909 ms | 17.362 ms / 18.697 ms |
+
+Current bottleneck: OBJ parse dominates large fixtures; pipeline and pack are now small fractions of total runtime.

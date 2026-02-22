@@ -12,7 +12,7 @@ This project uses a benchmark baseline gate for high-confidence performance trac
 
 ## Last Updated Benchmarks
 
-- Date: February 21, 2026
+- Date: February 22, 2026 (full outside-suite run captured)
 - Environment: outside sandbox, JDK 25.0.1, forked JMH runs
 - Baseline references currently tracked:
   - `OptimizeVertexCacheBenchmark.optimizeAndMeasureAcmr`: `294.325 ms/op`
@@ -20,6 +20,8 @@ This project uses a benchmark baseline gate for high-confidence performance trac
   - `MeshPackerBenchmark.packRealtime`: `5.356 ms/op`
   - `MeshOpsBenchmark.weld`: `3.478 ms/op`
   - `MeshOpsBenchmark.recalculateTangents`: `1.109 ms/op`
+
+Note: baseline values above are policy-gated references in `perf/baseline.csv`; refresh only after explicit review.
 
 ## Run the Perf Gate
 
