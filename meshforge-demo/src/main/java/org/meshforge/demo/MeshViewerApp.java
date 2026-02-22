@@ -27,9 +27,10 @@ import javafx.scene.transform.Rotate;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import org.meshforge.api.Packers;
-import org.meshforge.api.Pipelines;
+import org.meshforge.api.Ops;
 import org.meshforge.core.attr.AttributeSemantic;
 import org.meshforge.loader.MeshLoaders;
+import org.meshforge.ops.pipeline.MeshPipeline;
 import org.meshforge.pack.packer.MeshPacker;
 
 import java.io.File;
@@ -179,7 +180,14 @@ public final class MeshViewerApp extends Application {
 
         try {
             var mesh = MeshLoaders.defaults().load(file.toPath());
-            mesh = Pipelines.realtimeFast(mesh);
+            // For viewer consistency, always regenerate normals instead of trusting source data.
+            mesh = MeshPipeline.run(
+                mesh,
+                Ops.validate(),
+                Ops.removeDegenerates(),
+                Ops.normals(60f),
+                Ops.bounds()
+            );
             currentMesh = mesh;
             currentFileName = file.getName();
             renderCurrentMesh();
