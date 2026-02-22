@@ -10,10 +10,14 @@ import javafx.scene.AmbientLight;
 import javafx.scene.PointLight;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToolBar;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.PhongMaterial;
 import javafx.scene.shape.CullFace;
@@ -39,13 +43,19 @@ public final class MeshViewerApp extends Application {
     private static final double DEFAULT_CAMERA_Z = -8.0;
     private static final double MIN_CAMERA_Z = -0.8;
     private static final double MAX_CAMERA_Z = -300.0;
-    private static final boolean SHOW_WIREFRAME_OVERLAY = true;
+    private static final boolean DEFAULT_SHOW_WIREFRAME = false;
+    private static final boolean DEFAULT_SHOW_DEBUG = false;
 
     private final Group world = new Group();
     private final Rotate rotX = new Rotate(DEFAULT_ROT_X, Rotate.X_AXIS);
     private final Rotate rotY = new Rotate(DEFAULT_ROT_Y, Rotate.Y_AXIS);
     private PerspectiveCamera camera;
     private Label status;
+    private Label debugStatus;
+    private boolean showWireframe = DEFAULT_SHOW_WIREFRAME;
+    private boolean showDebug = DEFAULT_SHOW_DEBUG;
+    private org.meshforge.core.mesh.MeshData currentMesh;
+    private String currentFileName;
 
     private double dragStartX;
     private double dragStartY;
@@ -57,12 +67,33 @@ public final class MeshViewerApp extends Application {
         world.getTransforms().addAll(rotX, rotY);
 
         status = new Label("Open a mesh file to view");
+        debugStatus = new Label("");
+        debugStatus.setVisible(false);
+        debugStatus.setManaged(false);
+
         Button openButton = new Button("Open Mesh");
         openButton.setOnAction(e -> openMesh(stage));
+        ToggleButton wireframeToggle = new ToggleButton("Wireframe");
+        wireframeToggle.setSelected(showWireframe);
+        wireframeToggle.setOnAction(e -> {
+            showWireframe = wireframeToggle.isSelected();
+            rerenderCurrentMesh();
+        });
+        ToggleButton debugToggle = new ToggleButton("Debug");
+        debugToggle.setSelected(showDebug);
+        debugToggle.setOnAction(e -> {
+            showDebug = debugToggle.isSelected();
+            debugStatus.setVisible(showDebug);
+            debugStatus.setManaged(showDebug);
+            rerenderCurrentMesh();
+        });
 
-        ToolBar toolBar = new ToolBar(openButton, status);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        ToolBar toolBar = new ToolBar(openButton, wireframeToggle, debugToggle, spacer, status);
         BorderPane root = new BorderPane();
         root.setTop(toolBar);
+        root.setBottom(debugStatus);
         root.setPadding(new Insets(8));
 
         SubScene subScene = createViewport();
@@ -76,12 +107,16 @@ public final class MeshViewerApp extends Application {
 
     private SubScene createViewport() {
         Group root3d = new Group(world);
-        AmbientLight ambient = new AmbientLight(Color.color(0.55, 0.55, 0.60));
+        AmbientLight ambient = new AmbientLight(Color.color(0.75, 0.75, 0.78));
         PointLight key = new PointLight(Color.color(1.0, 1.0, 1.0));
-        key.setTranslateX(-6.0);
-        key.setTranslateY(-5.0);
-        key.setTranslateZ(-6.0);
-        root3d.getChildren().addAll(ambient, key);
+        key.setTranslateX(-8.0);
+        key.setTranslateY(-6.0);
+        key.setTranslateZ(-8.0);
+        PointLight fill = new PointLight(Color.color(0.75, 0.78, 0.85));
+        fill.setTranslateX(8.0);
+        fill.setTranslateY(2.0);
+        fill.setTranslateZ(-4.0);
+        root3d.getChildren().addAll(ambient, key, fill);
 
         SubScene sub = new SubScene(root3d, 1000, 700, true, null);
         sub.setFill(Color.rgb(28, 31, 38));
@@ -141,6 +176,28 @@ public final class MeshViewerApp extends Application {
         try {
             var mesh = MeshLoaders.defaults().load(file.toPath());
             mesh = Pipelines.realtimeFast(mesh);
+            currentMesh = mesh;
+            currentFileName = file.getName();
+            renderCurrentMesh();
+        } catch (Exception ex) {
+            status.setText("Load failed: " + ex.getClass().getSimpleName() + ": " + ex.getMessage());
+            debugStatus.setText("Load exception: " + ex);
+            ex.printStackTrace(System.err);
+        }
+    }
+
+    private void rerenderCurrentMesh() {
+        if (currentMesh != null) {
+            renderCurrentMesh();
+        }
+    }
+
+    private void renderCurrentMesh() {
+        try {
+            var mesh = currentMesh;
+            if (mesh == null) {
+                return;
+            }
 
             // Ensure pack path remains usable from UI flow.
             MeshPacker.pack(mesh, Packers.realtime());
@@ -149,13 +206,16 @@ public final class MeshViewerApp extends Application {
             Group meshGroup = new Group();
             for (var fxMesh : fxMeshes) {
                 MeshView view = new MeshView(fxMesh);
-                view.setMaterial(new PhongMaterial(Color.rgb(210, 218, 232)));
+                PhongMaterial material = new PhongMaterial(Color.rgb(214, 223, 236));
+                material.setSpecularColor(Color.rgb(90, 98, 110));
+                material.setSpecularPower(8.0);
+                view.setMaterial(material);
                 // Show both winding directions to reduce "invisible mesh" cases from mixed winding.
                 view.setCullFace(CullFace.NONE);
                 view.setDrawMode(DrawMode.FILL);
                 meshGroup.getChildren().add(view);
 
-                if (SHOW_WIREFRAME_OVERLAY) {
+                if (showWireframe) {
                     MeshView wire = new MeshView(fxMesh);
                     wire.setMaterial(new PhongMaterial(Color.color(0.10, 0.10, 0.10)));
                     wire.setCullFace(CullFace.NONE);
@@ -175,18 +235,22 @@ public final class MeshViewerApp extends Application {
             world.getChildren().setAll(meshGroup);
             double camZ = camera == null ? Double.NaN : camera.getTranslateZ();
 
-            status.setText(file.getName() + " | vertices=" + mesh.vertexCount() +
+            status.setText(currentFileName + " | vertices=" + mesh.vertexCount() +
                 " triangles=" + triangleCount + " indices=" + indexCount +
-                " chunks=" + fxMeshes.size() +
-                " radius=" + String.format("%.4f", radius) +
-                " viewRadius=" + String.format("%.4f", viewRadius) +
-                " center=(" + String.format("%.2f", center[0]) + "," +
-                String.format("%.2f", center[1]) + "," +
-                String.format("%.2f", center[2]) + ")" +
-                " scale=" + String.format("%.6f", scale) +
-                " camZ=" + String.format("%.3f", camZ));
+                " chunks=" + fxMeshes.size());
+            debugStatus.setText(
+                currentFileName +
+                    " | radius=" + String.format("%.4f", radius) +
+                    " viewRadius=" + String.format("%.4f", viewRadius) +
+                    " center=(" + String.format("%.2f", center[0]) + "," +
+                    String.format("%.2f", center[1]) + "," +
+                    String.format("%.2f", center[2]) + ")" +
+                    " scale=" + String.format("%.6f", scale) +
+                    " camZ=" + String.format("%.3f", camZ)
+            );
         } catch (Exception ex) {
-            status.setText("Load failed: " + ex.getClass().getSimpleName() + ": " + ex.getMessage());
+            status.setText("Render failed: " + ex.getClass().getSimpleName() + ": " + ex.getMessage());
+            debugStatus.setText("Render exception: " + ex);
             ex.printStackTrace(System.err);
         }
     }
