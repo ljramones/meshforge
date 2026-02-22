@@ -252,15 +252,26 @@ public final class MeshViewerApp extends Application {
             return new ViewFrame(fallbackCx, fallbackCy, fallbackCz, fallbackRadius);
         }
 
+        int[] indices = mesh.indicesOrNull();
         int vertexCount = positions.length / 3;
-        int step = Math.max(1, vertexCount / 4096);
-        int sampleCount = (vertexCount + step - 1) / step;
+        boolean useIndexedSampling = indices != null && indices.length > 0;
+
+        int sourceCount = useIndexedSampling ? indices.length : vertexCount;
+        int step = Math.max(1, sourceCount / 4096);
+        int sampleCount = (sourceCount + step - 1) / step;
         float[] xs = new float[sampleCount];
         float[] ys = new float[sampleCount];
         float[] zs = new float[sampleCount];
 
         int s = 0;
-        for (int v = 0; v < vertexCount; v += step) {
+        for (int sourceIndex = 0; sourceIndex < sourceCount; sourceIndex += step) {
+            int v = sourceIndex;
+            if (useIndexedSampling) {
+                v = indices[sourceIndex];
+                if (v < 0 || v >= vertexCount) {
+                    continue;
+                }
+            }
             int p = v * 3;
             float x = positions[p];
             float y = positions[p + 1];
