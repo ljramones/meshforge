@@ -41,6 +41,12 @@ public final class MeshForgeDemo {
         double after = MeshletStats.averageCenterStep(optimizedPacked);
         double improvementPct = before <= 0.0 ? 0.0 : ((before - after) / before) * 100.0;
         System.out.printf("Meshlet locality avg step: %.4f -> %.4f (improvement %.2f%%)%n", before, after, improvementPct);
+
+        System.out.println();
+        System.out.println("Cone culling simulation (baseline):");
+        printConeViews(baselinePacked);
+        System.out.println("Cone culling simulation (optimized):");
+        printConeViews(optimizedPacked);
     }
 
     private static PackedMesh loadAndPack(Path path, boolean optimizeOrder) throws Exception {
@@ -51,5 +57,12 @@ public final class MeshForgeDemo {
             mesh = MeshPipeline.run(mesh, Ops.optimizeMeshletOrder());
         }
         return MeshPacker.pack(mesh, Packers.realtimeWithMeshlets());
+    }
+
+    private static void printConeViews(PackedMesh packed) {
+        System.out.println("  " + MeshletStats.summarizeConeCulling(packed, "Front", 0.0f, 0.0f, -1.0f));
+        System.out.println("  " + MeshletStats.summarizeConeCulling(packed, "Right", 1.0f, 0.0f, 0.0f));
+        System.out.println("  " + MeshletStats.summarizeConeCulling(packed, "Top", 0.0f, 1.0f, 0.0f));
+        System.out.println("  " + MeshletStats.summarizeConeCulling(packed, "Left", -1.0f, 0.0f, 0.0f));
     }
 }
