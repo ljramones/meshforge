@@ -385,24 +385,25 @@ mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTimi
 mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast" exec:java
 ```
 
-Latest snapshot (February 21, 2026, local machine run):
+Latest fast-loader snapshot (February 21, 2026, local machine run):
 
-| Fixture | Legacy Total (median / p95) ms | Fast Total (median / p95) ms | Speedup |
-|---|---:|---:|---:|
-| `beast.obj` | 48 / 50 | 10 / 16 | 4.80x |
-| `cow.obj` | 2 / 3 | 0 / 1 | ~2x+ |
-| `lucy.obj` | 62 / 76 | 19 / 19 | 3.26x |
-| `nefertiti.obj` | 53 / 57 | 15 / 16 | 3.53x |
-| `RevitHouse.obj` | 830 / 863 | 267 / 284 | 3.11x |
-| `stanford-bunny.obj` | 32 / 32 | 9 / 9 | 3.56x |
-| `suzanne.obj` | 0 / 0 | 0 / 0 | n/a |
-| `teapot.obj` | 2 / 3 | 0 / 1 | ~2x+ |
-| `xyzrgb_dragon.obj` | 170 / 204 | 38 / 41 | 4.47x |
+| Fixture | Parse (median / p95) | Pipeline (median / p95) | Pack (median / p95) | Total (median / p95) |
+|---|---:|---:|---:|---:|
+| `beast.obj` | 6.278 ms / 11.481 ms | 501 us / 689 us | 3.568 ms / 4.472 ms | 10.319 ms / 16.642 ms |
+| `cow.obj` | 523 us / 573 us | 48 us / 83 us | 270 us / 307 us | 850 us / 897 us |
+| `lucy.obj` | 12.770 ms / 12.879 ms | 711 us / 727 us | 4.906 ms / 5.022 ms | 18.407 ms / 18.513 ms |
+| `nefertiti.obj` | 9.589 ms / 9.976 ms | 731 us / 776 us | 4.704 ms / 4.768 ms | 15.052 ms / 15.288 ms |
+| `RevitHouse.obj` | 172.474 ms / 176.933 ms | 6.040 ms / 6.967 ms | 81.114 ms / 111.144 ms | 261.824 ms / 294.401 ms |
+| `stanford-bunny.obj` | 6.173 ms / 6.309 ms | 538 us / 555 us | 2.431 ms / 2.487 ms | 9.157 ms / 9.225 ms |
+| `suzanne.obj` | 121 us / 143 us | 9 us / 23 us | 42 us / 50 us | 175 us / 217 us |
+| `teapot.obj` | 626 us / 647 us | 48 us / 48 us | 243 us / 259 us | 918 us / 954 us |
+| `xyzrgb_dragon.obj` | 27.565 ms / 29.736 ms | 1.733 ms / 1.772 ms | 8.050 ms / 8.512 ms | 37.388 ms / 39.379 ms |
 
-Fast-loader parse phase examples (`--fast`):
-- `RevitHouse.obj`: parse `180 / 183 ms` (from legacy `729 / 737 ms`)
-- `xyzrgb_dragon.obj`: parse `28 / 28 ms` (from legacy `160 / 190 ms`)
-- `lucy.obj`: parse `13 / 13 ms` (from legacy `58 / 70 ms`)
+Key observations:
+- Fast OBJ parsing delivered ~3-5x speedup vs legacy on large fixtures.
+- Parse remains the largest contributor on large assets (~66-74% of total).
+- Pack is now the clear #2 target on large assets.
+- Pipeline remains negligible for realtime import paths.
 
 CSV outputs are written to `perf/results/phase-split-legacy-<timestamp>.csv` and `perf/results/phase-split-fast-<timestamp>.csv`.
 For very small fixtures, millisecond rounding can show `0 ms`; use larger iteration counts if you need finer phase resolution.
