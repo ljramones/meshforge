@@ -21,6 +21,8 @@ import java.util.List;
 public final class FastObjMeshLoader {
     private static final double[] POW10_POS = new double[20];
     private static final double[] POW10_NEG = new double[20];
+    private static final ThreadLocal<MutableParseProfile> LAST_PROFILE = new ThreadLocal<>();
+    private static volatile boolean parseProfilingEnabled;
 
     static {
         POW10_POS[0] = 1.0;
@@ -34,6 +36,18 @@ public final class FastObjMeshLoader {
     private FastObjMeshLoader() {
     }
 
+    public static void setParseProfilingEnabled(boolean enabled) {
+        parseProfilingEnabled = enabled;
+        if (!enabled) {
+            LAST_PROFILE.remove();
+        }
+    }
+
+    public static ParseProfile lastParseProfile() {
+        MutableParseProfile p = LAST_PROFILE.get();
+        return p == null ? null : p.snapshot();
+    }
+
     public static MeshData load(Path path) throws IOException {
         try (FileChannel ch = FileChannel.open(path, StandardOpenOption.READ)) {
             long size = ch.size();
@@ -41,13 +55,23 @@ public final class FastObjMeshLoader {
                 throw new IOException("OBJ file too large for v1 loader: " + path);
             }
             MappedByteBuffer buf = ch.map(FileChannel.MapMode.READ_ONLY, 0, size);
-            return parse(buf, (int) size);
+            MutableParseProfile profile = parseProfilingEnabled ? new MutableParseProfile() : null;
+            long parseStartNs = profile == null ? 0L : System.nanoTime();
+            MeshData out = parse(buf, (int) size, profile);
+            if (profile != null) {
+                profile.totalNs = System.nanoTime() - parseStartNs;
+                LAST_PROFILE.set(profile);
+            } else {
+                LAST_PROFILE.remove();
+            }
+            return out;
         }
     }
 
-    private static MeshData parse(MappedByteBuffer buf, int n) throws IOException {
+    private static MeshData parse(MappedByteBuffer buf, int n, MutableParseProfile profile) throws IOException {
         FloatArray positions = new FloatArray(8192);
         IntArray indices = new IntArray(8192);
+        long scanStartNs = profile == null ? 0L : System.nanoTime();
 
         int i = 0;
         while (i < n) {
@@ -69,7 +93,7 @@ public final class FastObjMeshLoader {
             if (b == 'v') {
                 int next = i + 1 < n ? byteAt(buf, i + 1) : -1;
                 if (isHorizontalWhitespace(next)) {
-                    i = parseVertexLine(buf, i + 1, n, positions);
+                    i = parseVertexLine(buf, i + 1, n, positions, profile);
                     continue;
                 }
                 i = skipLine(buf, i, n);
@@ -79,7 +103,13 @@ public final class FastObjMeshLoader {
             if (b == 'f') {
                 int next = i + 1 < n ? byteAt(buf, i + 1) : -1;
                 if (isHorizontalWhitespace(next)) {
-                    i = parseFaceLine(buf, i + 1, n, indices);
+                    if (profile != null) {
+                        long t = System.nanoTime();
+                        i = parseFaceLine(buf, i + 1, n, indices, profile);
+                        profile.faceAssembleNs += System.nanoTime() - t;
+                    } else {
+                        i = parseFaceLine(buf, i + 1, n, indices, null);
+                    }
                     continue;
                 }
                 i = skipLine(buf, i, n);
@@ -87,6 +117,10 @@ public final class FastObjMeshLoader {
             }
 
             i = skipLine(buf, i, n);
+        }
+        if (profile != null) {
+            long scanNs = System.nanoTime() - scanStartNs - profile.floatParseNs - profile.faceAssembleNs;
+            profile.tokenScanNs = Math.max(0L, scanNs);
         }
 
         VertexSchema schema = VertexSchema.builder()
@@ -108,27 +142,34 @@ public final class FastObjMeshLoader {
             throw new IOException("POSITION storage is unavailable");
         }
         System.arraycopy(positions.data, 0, dst, 0, positions.size);
+        if (profile != null) {
+            profile.vertexCount = vertexCount;
+            profile.triangleCount = indexData.length / 3;
+        }
         return mesh;
     }
 
-    private static int parseVertexLine(MappedByteBuffer buf, int i, int n, FloatArray positions) throws IOException {
+    private static int parseVertexLine(MappedByteBuffer buf, int i, int n, FloatArray positions, MutableParseProfile profile) throws IOException {
         i = skipHorizontalWhitespace(buf, i, n);
-        float x = parseFloat(buf, i, n);
+        float x = profile == null ? parseFloat(buf, i, n) : parseFloatTimed(buf, i, n, profile);
         i = skipNumber(buf, i, n);
         i = skipHorizontalWhitespace(buf, i, n);
-        float y = parseFloat(buf, i, n);
+        float y = profile == null ? parseFloat(buf, i, n) : parseFloatTimed(buf, i, n, profile);
         i = skipNumber(buf, i, n);
         i = skipHorizontalWhitespace(buf, i, n);
-        float z = parseFloat(buf, i, n);
+        float z = profile == null ? parseFloat(buf, i, n) : parseFloatTimed(buf, i, n, profile);
         i = skipNumber(buf, i, n);
 
         positions.add(x);
         positions.add(y);
         positions.add(z);
+        if (profile != null) {
+            profile.vertexLineCount++;
+        }
         return skipLine(buf, i, n);
     }
 
-    private static int parseFaceLine(MappedByteBuffer buf, int i, int n, IntArray indices) throws IOException {
+    private static int parseFaceLine(MappedByteBuffer buf, int i, int n, IntArray indices, MutableParseProfile profile) throws IOException {
         i = skipHorizontalWhitespace(buf, i, n);
         int first = parseFaceVertexIndex(buf, i, n);
         i = skipFaceToken(buf, i, n);
@@ -151,7 +192,13 @@ public final class FastObjMeshLoader {
             indices.add(first);
             indices.add(prev);
             indices.add(curr);
+            if (profile != null) {
+                profile.faceTriangleCount++;
+            }
             prev = curr;
+        }
+        if (profile != null) {
+            profile.faceLineCount++;
         }
         return skipLine(buf, i, n);
     }
@@ -297,6 +344,13 @@ public final class FastObjMeshLoader {
         return (float) (sign * value);
     }
 
+    private static float parseFloatTimed(MappedByteBuffer buf, int i, int n, MutableParseProfile profile) throws IOException {
+        long t = System.nanoTime();
+        float out = parseFloat(buf, i, n);
+        profile.floatParseNs += System.nanoTime() - t;
+        return out;
+    }
+
     private static int skipHorizontalWhitespace(MappedByteBuffer buf, int i, int n) {
         while (i < n && isHorizontalWhitespace(byteAt(buf, i))) {
             i++;
@@ -410,6 +464,45 @@ public final class FastObjMeshLoader {
             int[] resized = new int[next];
             System.arraycopy(data, 0, resized, 0, size);
             data = resized;
+        }
+    }
+
+    public record ParseProfile(
+        long totalNs,
+        long tokenScanNs,
+        long floatParseNs,
+        long faceAssembleNs,
+        int vertexCount,
+        int triangleCount,
+        int vertexLineCount,
+        int faceLineCount,
+        int faceTriangleCount
+    ) {
+    }
+
+    private static final class MutableParseProfile {
+        long totalNs;
+        long tokenScanNs;
+        long floatParseNs;
+        long faceAssembleNs;
+        int vertexCount;
+        int triangleCount;
+        int vertexLineCount;
+        int faceLineCount;
+        int faceTriangleCount;
+
+        ParseProfile snapshot() {
+            return new ParseProfile(
+                totalNs,
+                tokenScanNs,
+                floatParseNs,
+                faceAssembleNs,
+                vertexCount,
+                triangleCount,
+                vertexLineCount,
+                faceLineCount,
+                faceTriangleCount
+            );
         }
     }
 }

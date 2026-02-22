@@ -3,6 +3,7 @@ package org.meshforge.demo;
 import org.meshforge.api.Packers;
 import org.meshforge.api.Pipelines;
 import org.meshforge.core.mesh.MeshData;
+import org.meshforge.loader.FastObjMeshLoader;
 import org.meshforge.loader.MeshLoaders;
 import org.meshforge.pack.packer.MeshPacker;
 import org.meshforge.pack.spec.PackSpec;
@@ -33,6 +34,7 @@ public final class PhaseSplitFixtureTiming {
     public static void main(String[] args) throws Exception {
         boolean fastLoader = true;
         boolean profilePack = false;
+        boolean profileParse = false;
         boolean packMinimal = false;
         boolean parseOnly = false;
         String fixtureFilter = null;
@@ -45,6 +47,8 @@ public final class PhaseSplitFixtureTiming {
                 fastLoader = true;
             } else if ("--profile-pack".equals(arg)) {
                 profilePack = true;
+            } else if ("--profile-parse".equals(arg)) {
+                profileParse = true;
             } else if ("--pack-minimal".equals(arg)) {
                 packMinimal = true;
             } else if ("--parse-only".equals(arg)) {
@@ -84,36 +88,59 @@ public final class PhaseSplitFixtureTiming {
 
         MeshLoaders loaders = fastLoader ? MeshLoaders.defaultsFast() : MeshLoaders.defaultsLegacy();
         List<TimingStats> all = new ArrayList<>();
-
-        System.out.println(
-            "Phase-split timing (" + (fastLoader ? "fast" : "legacy") +
-                ", " + (packMinimal ? "minimal" : "realtime") + " pack spec" +
-                ", " + (parseOnly ? "parse-only" : "full phases") +
-                ", median + p95 over " + timedRuns +
-                " timed runs after " + warmupRuns + " warmup runs)"
-        );
-        System.out.println();
-        for (Path fixture : fixtures) {
-            TimingStats stats = runFixture(loaders, fixture, packMinimal, parseOnly, warmupRuns, timedRuns);
-            all.add(stats);
-            System.out.printf(
-                Locale.ROOT,
-                "%-20s parse: %12s (p95 %12s) | pipeline: %12s (p95 %12s) | pack: %12s (p95 %12s) | total: %12s (p95 %12s)%n",
-                stats.fixture() + ":",
-                formatUs(stats.parseMedianUs()), formatUs(stats.parseP95Us()),
-                formatUs(stats.pipelineMedianUs()), formatUs(stats.pipelineP95Us()),
-                formatUs(stats.packMedianUs()), formatUs(stats.packP95Us()),
-                formatUs(stats.totalMedianUs()), formatUs(stats.totalP95Us())
+        FastObjMeshLoader.setParseProfilingEnabled(fastLoader && profileParse);
+        try {
+            System.out.println(
+                "Phase-split timing (" + (fastLoader ? "fast" : "legacy") +
+                    ", " + (packMinimal ? "minimal" : "realtime") + " pack spec" +
+                    ", " + (parseOnly ? "parse-only" : "full phases") +
+                    ", " + (profileParse ? "parse-profiled" : "parse-unprofiled") +
+                    ", median + p95 over " + timedRuns +
+                    " timed runs after " + warmupRuns + " warmup runs)"
             );
-        }
+            System.out.println();
+            for (Path fixture : fixtures) {
+                TimingStats stats = runFixture(loaders, fixture, packMinimal, parseOnly, fastLoader && profileParse, warmupRuns, timedRuns);
+                all.add(stats);
+                System.out.printf(
+                    Locale.ROOT,
+                    "%-20s parse: %12s (p95 %12s) | pipeline: %12s (p95 %12s) | pack: %12s (p95 %12s) | total: %12s (p95 %12s)%n",
+                    stats.fixture() + ":",
+                    formatUs(stats.parseMedianUs()), formatUs(stats.parseP95Us()),
+                    formatUs(stats.pipelineMedianUs()), formatUs(stats.pipelineP95Us()),
+                    formatUs(stats.packMedianUs()), formatUs(stats.packP95Us()),
+                    formatUs(stats.totalMedianUs()), formatUs(stats.totalP95Us())
+                );
+                System.out.printf(
+                    Locale.ROOT,
+                    "  verts=%d tris=%d parse/1M verts=%.3f us",
+                    stats.vertexCount(),
+                    stats.triangleCount(),
+                    stats.parseUsPer1MVerts()
+                );
+                if (profileParse) {
+                    System.out.printf(
+                        Locale.ROOT,
+                        " | parse breakdown scan=%s float=%s face=%s%n",
+                        formatUs(stats.parseScanMedianUs()),
+                        formatUs(stats.parseFloatMedianUs()),
+                        formatUs(stats.parseFaceMedianUs())
+                    );
+                } else {
+                    System.out.println();
+                }
+            }
 
-        Path outDir = Path.of("perf", "results");
-        Files.createDirectories(outDir);
-        String suffix = parseOnly ? "-parse-only" : "";
-        Path outFile = outDir.resolve("phase-split-" + (fastLoader ? "fast" : "legacy") + suffix + "-" + LocalDateTime.now().format(TS) + ".csv");
-        writeCsv(outFile, all);
-        System.out.println();
-        System.out.println("Results written to: " + outFile.toAbsolutePath());
+            Path outDir = Path.of("perf", "results");
+            Files.createDirectories(outDir);
+            String suffix = parseOnly ? "-parse-only" : "";
+            Path outFile = outDir.resolve("phase-split-" + (fastLoader ? "fast" : "legacy") + suffix + "-" + LocalDateTime.now().format(TS) + ".csv");
+            writeCsv(outFile, all);
+            System.out.println();
+            System.out.println("Results written to: " + outFile.toAbsolutePath());
+        } finally {
+            FastObjMeshLoader.setParseProfilingEnabled(false);
+        }
     }
 
     private static TimingStats runFixture(
@@ -121,6 +148,7 @@ public final class PhaseSplitFixtureTiming {
         Path fixture,
         boolean packMinimal,
         boolean parseOnly,
+        boolean profileParse,
         int warmupRuns,
         int timedRuns
     ) throws IOException {
@@ -129,6 +157,11 @@ public final class PhaseSplitFixtureTiming {
         List<Long> pipelineUs = new ArrayList<>(timedRuns);
         List<Long> packUs = new ArrayList<>(timedRuns);
         List<Long> totalUs = new ArrayList<>(timedRuns);
+        List<Long> parseScanUs = new ArrayList<>(timedRuns);
+        List<Long> parseFloatUs = new ArrayList<>(timedRuns);
+        List<Long> parseFaceUs = new ArrayList<>(timedRuns);
+        int vertexCount = 0;
+        int triangleCount = 0;
 
         for (int run = 0; run < warmupRuns + timedRuns; run++) {
             long t0 = System.nanoTime();
@@ -136,6 +169,10 @@ public final class PhaseSplitFixtureTiming {
             long tp = System.nanoTime();
             MeshData mesh = loaders.load(fixture);
             long parseNs = System.nanoTime() - tp;
+            if (vertexCount == 0) {
+                vertexCount = mesh.vertexCount();
+                triangleCount = mesh.indicesOrNull() == null ? 0 : (mesh.indicesOrNull().length / 3);
+            }
 
             long pipelineNs = 0L;
             long packNs = 0L;
@@ -156,15 +193,44 @@ public final class PhaseSplitFixtureTiming {
                 pipelineUs.add(pipelineNs / 1_000L);
                 packUs.add(packNs / 1_000L);
                 totalUs.add(totalNs / 1_000L);
+                if (profileParse) {
+                    FastObjMeshLoader.ParseProfile p = FastObjMeshLoader.lastParseProfile();
+                    if (p != null) {
+                        parseScanUs.add(p.tokenScanNs() / 1_000L);
+                        parseFloatUs.add(p.floatParseNs() / 1_000L);
+                        parseFaceUs.add(p.faceAssembleNs() / 1_000L);
+                    }
+                }
             }
         }
 
+        long parseMedian = median(parseUs);
+        long parseP95 = p95(parseUs);
+        long pipelineMedian = median(pipelineUs);
+        long pipelineP95 = p95(pipelineUs);
+        long packMedian = median(packUs);
+        long packP95 = p95(packUs);
+        long totalMedian = median(totalUs);
+        long totalP95 = p95(totalUs);
+        long parseScanMedian = parseScanUs.isEmpty() ? 0L : median(parseScanUs);
+        long parseScanP95 = parseScanUs.isEmpty() ? 0L : p95(parseScanUs);
+        long parseFloatMedian = parseFloatUs.isEmpty() ? 0L : median(parseFloatUs);
+        long parseFloatP95 = parseFloatUs.isEmpty() ? 0L : p95(parseFloatUs);
+        long parseFaceMedian = parseFaceUs.isEmpty() ? 0L : median(parseFaceUs);
+        long parseFaceP95 = parseFaceUs.isEmpty() ? 0L : p95(parseFaceUs);
+        double parseUsPer1MVerts = vertexCount > 0 ? (parseMedian * 1_000_000.0) / vertexCount : 0.0;
+
         return new TimingStats(
             fixture.getFileName().toString(),
-            median(parseUs), p95(parseUs),
-            median(pipelineUs), p95(pipelineUs),
-            median(packUs), p95(packUs),
-            median(totalUs), p95(totalUs)
+            parseMedian, parseP95,
+            pipelineMedian, pipelineP95,
+            packMedian, packP95,
+            totalMedian, totalP95,
+            vertexCount, triangleCount,
+            parseUsPer1MVerts,
+            parseScanMedian, parseScanP95,
+            parseFloatMedian, parseFloatP95,
+            parseFaceMedian, parseFaceP95
         );
     }
 
@@ -191,11 +257,20 @@ public final class PhaseSplitFixtureTiming {
 
     private static void writeCsv(Path outFile, List<TimingStats> stats) throws IOException {
         StringBuilder sb = new StringBuilder();
-        sb.append("fixture,parse_median_us,parse_p95_us,pipeline_median_us,pipeline_p95_us,pack_median_us,pack_p95_us,total_median_us,total_p95_us\n");
+        sb.append("fixture,vertex_count,triangle_count,parse_median_us,parse_p95_us,parse_us_per_1m_verts,parse_scan_median_us,parse_scan_p95_us,parse_float_median_us,parse_float_p95_us,parse_face_median_us,parse_face_p95_us,pipeline_median_us,pipeline_p95_us,pack_median_us,pack_p95_us,total_median_us,total_p95_us\n");
         for (TimingStats s : stats) {
             sb.append(s.fixture()).append(',')
+                .append(s.vertexCount()).append(',')
+                .append(s.triangleCount()).append(',')
                 .append(s.parseMedianUs()).append(',')
                 .append(s.parseP95Us()).append(',')
+                .append(String.format(Locale.ROOT, "%.3f", s.parseUsPer1MVerts())).append(',')
+                .append(s.parseScanMedianUs()).append(',')
+                .append(s.parseScanP95Us()).append(',')
+                .append(s.parseFloatMedianUs()).append(',')
+                .append(s.parseFloatP95Us()).append(',')
+                .append(s.parseFaceMedianUs()).append(',')
+                .append(s.parseFaceP95Us()).append(',')
                 .append(s.pipelineMedianUs()).append(',')
                 .append(s.pipelineP95Us()).append(',')
                 .append(s.packMedianUs()).append(',')
@@ -222,7 +297,16 @@ public final class PhaseSplitFixtureTiming {
         long packMedianUs,
         long packP95Us,
         long totalMedianUs,
-        long totalP95Us
+        long totalP95Us,
+        int vertexCount,
+        int triangleCount,
+        double parseUsPer1MVerts,
+        long parseScanMedianUs,
+        long parseScanP95Us,
+        long parseFloatMedianUs,
+        long parseFloatP95Us,
+        long parseFaceMedianUs,
+        long parseFaceP95Us
     ) {
     }
 }
