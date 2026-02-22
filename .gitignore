@@ -28,3 +28,4 @@ replay_pid*
 /.mvn/timing.properties
 /org.meshforge.bench.OptimizeVertexCacheBenchmark.optimizeAndMeasureAcmr-AverageTime/profile.jfr
 *.jfr
+perf/results/

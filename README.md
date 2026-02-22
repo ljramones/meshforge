@@ -289,6 +289,14 @@ Interpretation tip:
 - `MeshPipelineBenchmark.realtimePipeline` is an import/preprocess cost, not per-frame render cost.
 - Use `Pipelines.realtimeFast(...)` when source meshes are already clean and you want lower import latency.
 
+Perf gate:
+
+```bash
+./scripts/perf-gate.sh
+```
+
+Baseline config is in `perf/baseline.csv`, with process notes in `docs/perf-baseline.md`.
+
 ---
 
 # Current Scope (v1)
