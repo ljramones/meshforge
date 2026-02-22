@@ -180,6 +180,7 @@ public final class MeshViewerApp extends Application {
 
         try {
             var mesh = MeshLoaders.defaults().load(file.toPath());
+            mesh = ensureConsistentWinding(mesh);
             // For viewer consistency, always regenerate normals instead of trusting source data.
             mesh = MeshPipeline.run(
                 mesh,
@@ -425,5 +426,62 @@ public final class MeshViewerApp extends Application {
             this.centerZ = centerZ;
             this.radius = radius;
         }
+    }
+
+    private static org.meshforge.core.mesh.MeshData ensureConsistentWinding(org.meshforge.core.mesh.MeshData mesh) {
+        int[] indices = mesh.indicesOrNull();
+        if (indices == null || indices.length < 3 || (indices.length % 3) != 0) {
+            return mesh;
+        }
+        if (!mesh.has(AttributeSemantic.POSITION, 0)) {
+            return mesh;
+        }
+        float[] pos = mesh.attribute(AttributeSemantic.POSITION, 0).rawFloatArrayOrNull();
+        if (pos == null || pos.length < 3) {
+            return mesh;
+        }
+
+        // Approximate signed volume for closed meshes. Negative suggests globally reversed winding.
+        double signed6xVolume = 0.0;
+        for (int i = 0; i < indices.length; i += 3) {
+            int ia = indices[i] * 3;
+            int ib = indices[i + 1] * 3;
+            int ic = indices[i + 2] * 3;
+            if (ia < 0 || ib < 0 || ic < 0 || ia + 2 >= pos.length || ib + 2 >= pos.length || ic + 2 >= pos.length) {
+                continue;
+            }
+
+            double ax = pos[ia];
+            double ay = pos[ia + 1];
+            double az = pos[ia + 2];
+            double bx = pos[ib];
+            double by = pos[ib + 1];
+            double bz = pos[ib + 2];
+            double cx = pos[ic];
+            double cy = pos[ic + 1];
+            double cz = pos[ic + 2];
+
+            double cpx = by * cz - bz * cy;
+            double cpy = bz * cx - bx * cz;
+            double cpz = bx * cy - by * cx;
+            signed6xVolume += ax * cpx + ay * cpy + az * cpz;
+        }
+
+        // For near-zero/open meshes, keep as-is.
+        if (Math.abs(signed6xVolume) < 1.0e-6) {
+            return mesh;
+        }
+        if (signed6xVolume > 0.0) {
+            return mesh;
+        }
+
+        int[] flipped = indices.clone();
+        for (int i = 0; i < flipped.length; i += 3) {
+            int t = flipped[i + 1];
+            flipped[i + 1] = flipped[i + 2];
+            flipped[i + 2] = t;
+        }
+        mesh.setIndices(flipped);
+        return mesh;
     }
 }
