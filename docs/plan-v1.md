@@ -1,7 +1,7 @@
 # MeshForge v1 Plan (with Vectrix)
 
 ## Goal
-Authoring `MeshData` -> Ops -> `PackedMesh` suitable for real-time rendering.
+Authoring `MeshData` -> Ops -> immutable `PackedMesh` suitable for high-throughput downstream consumption.
 
 ## Milestone 1: Authoring Core (MeshData)
 ### Tasks
@@ -31,7 +31,7 @@ Authoring `MeshData` -> Ops -> `PackedMesh` suitable for real-time rendering.
 - Normals are unit length within epsilon for cube/sphere fixtures
 - Tangents exist and `w` is `+/-1`
 
-## Milestone 3: First Renderer-Ready Pack
+## Milestone 3: First Runtime Pack
 ### Tasks
 - [x] `PackSpec.debug()` (`F32` everything)
 - [x] `PackSpec.realtime()` (compressed normal/tangent, half uv)
@@ -43,7 +43,7 @@ Authoring `MeshData` -> Ops -> `PackedMesh` suitable for real-time rendering.
 - Packed stride/offsets match expected layout
 - Vertex/index buffers are direct `ByteBuffer`
 - Index type uses `UINT16` when possible, `UINT32` otherwise
-- Integration test uploads packed cube and renders correctly
+- Integration test verifies packed cube layout/indices and deterministic output
 
 ## Milestone 4: Throughput and Size
 ### Tasks

@@ -15,7 +15,7 @@ MeshForge is organized around three user-facing stages:
 ### Authoring (`org.meshforge.core.*`)
 - `MeshData`: editable semantic mesh model
 - `Topology`: primitive mode (TRIANGLES/LINES/POINTS)
-- `Submesh`: draw range and material association
+- `Submesh`: index range and material association
 - `VertexSchema`: declared attribute contract
 - `VertexAttributeView`: typed/bulk attribute access
 - `MeshBuilder`: ergonomic mesh construction
@@ -36,7 +36,7 @@ Planned op categories:
 - `PackSpec`: packing and compression policy
 - `MeshPacker`: `MeshData` -> `PackedMesh`
 - `PackedMesh`: immutable runtime mesh payload
-- `VertexLayout`: renderer-facing format/offset/stride description
+- `VertexLayout`: consumer-facing format/offset/stride description
 - `VertexBufferView` / `IndexBufferView`: packed buffer views
 
 ## Convenience Facade (`org.meshforge.api`)
@@ -74,7 +74,7 @@ PackedMesh packed = MeshPacker.pack(mesh, Packers.realtimeFast());
 
 ## Notes
 - Core MeshForge stays renderer-API agnostic.
-- `MeshData` favors flexibility; `PackedMesh` favors upload/runtime efficiency.
+- `MeshData` favors flexibility; `PackedMesh` favors compact immutable runtime handoff.
 - For design rationale and boundaries, see `docs/meshforge-architecture.md`.
 - For internal authoring storage details (SoA layout, storage kinds, dirty flags), see `docs/internal-storage.md`.
 - For realtime defaults and optimization priorities, see `docs/performance-profile.md`.

@@ -128,5 +128,5 @@ Public:
 ## Boundary Summary
 
 - `MeshData`: SoA-by-attribute authoring model
-- `PackedMesh`: render-oriented packed model
+- `PackedMesh`: runtime-oriented packed model
 - conversion occurs explicitly in pack stage

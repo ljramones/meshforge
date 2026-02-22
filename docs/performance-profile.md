@@ -18,7 +18,7 @@ This document defines the implementation priority and realtime packing defaults 
 - `WeldVerticesOp(epsilon)`
 - `CompactVerticesOp`
 
-4. Normals + tangents (rendering-ready)
+4. Normals + tangents (runtime-ready)
 - `RecalculateNormalsOp(angleThresholdDeg)`
 - `RecalculateTangentsOp()` (v1 consistent basis; MikkTSpace-style can follow)
 
@@ -67,7 +67,7 @@ Assuming float32 authoring attributes:
 - `WEIGHTS0` -> `UNORM8x4` (renormalize on write)
 
 ### Derived and removed attributes
-- do not store `BITANGENT`; reconstruct in shader from normal + tangent + sign
+- do not store `BITANGENT`; reconstruct downstream from normal + tangent + sign
 - drop unknown attributes by default unless `preserveUnknown` is enabled
 
 ### Pre-pack safety hooks
@@ -93,8 +93,8 @@ Assuming float32 authoring attributes:
 `PackSpec.realtime()` should produce a `PackedMesh` that is:
 - bandwidth efficient
 - cache friendly
-- correct for PBR shading
-- directly uploadable to rendering backends
+- correct and deterministic for consumer pipelines
+- directly consumable by downstream systems
 
 ## Non-Priorities (v1)
 
