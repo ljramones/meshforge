@@ -142,6 +142,6 @@ mvn -pl meshforge -Pbench test-compile exec:java -Djmh.filter='.*MeshSizeScaling
 
 - initial baseline: ~850 ms/op
 - incremental cache-position update: ~400 ms/op
-- heap candidate selection + score lookup tables + push gating: ~294 ms/op
+- heap candidate selection + score lookup tables + push gating: ~294-302 ms/op
 
 Use this as a directional performance guardrail; exact values vary by machine/JVM.

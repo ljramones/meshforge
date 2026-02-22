@@ -247,10 +247,10 @@ mvn -pl meshforge -Pbench test-compile exec:java   # run JMH benchmarks for mesh
 
 # Benchmark Snapshot
 
-Command run on February 21, 2026:
+Command run outside sandbox on February 21, 2026:
 
 ```bash
-mvn -pl meshforge -Pbench test-compile exec:java -Djmh.filter='.*(OptimizeVertexCacheBenchmark|MeshPackerBenchmark|MeshPipelineBenchmark).*'
+./scripts/run-jmh.sh
 ```
 
 Forked run outside sandbox (recommended for trustworthy numbers):
@@ -266,18 +266,27 @@ Reliable forked runner script (uses direct `java -cp ...` and works outside sand
 JMH_FILTER='.*MeshPackerBenchmark.*' JMH_FORKS=2 ./scripts/run-jmh.sh
 ```
 
-Results (JMH `avgt`, non-forked `-f 0`):
+Results (JMH `avgt`, forked, `Cnt=20`):
 
 | Benchmark | Units | Score | Error | Cnt |
 |---|---|---:|---:|---:|
-| `MeshPackerBenchmark.packDebug` | `ms/op` | 5.679 | ±0.475 | 5 |
-| `MeshPackerBenchmark.packRealtime` | `ms/op` | 5.562 | ±0.236 | 5 |
-| `MeshPipelineBenchmark.realtimePipeline` | `ms/op` | 305.447 | ±18.161 | 5 |
-| `OptimizeVertexCacheBenchmark.optimizeAndMeasureAcmr` | `ms/op` | 850.174 | ±110.213 | 5 |
+| `MeshOpsBenchmark.computeBounds` | `ms/op` | 0.110 | ±0.001 | 20 |
+| `MeshOpsBenchmark.optimizeVertexCache` | `ms/op` | 293.849 | ±4.544 | 20 |
+| `MeshOpsBenchmark.recalculateNormals` | `ms/op` | 0.501 | ±0.007 | 20 |
+| `MeshOpsBenchmark.recalculateTangents` | `ms/op` | 1.111 | ±0.003 | 20 |
+| `MeshOpsBenchmark.removeDegenerates` | `ms/op` | 0.312 | ±0.015 | 20 |
+| `MeshOpsBenchmark.validate` | `ms/op` | 0.073 | ±0.003 | 20 |
+| `MeshOpsBenchmark.weld` | `ms/op` | 3.372 | ±0.064 | 20 |
+| `MeshPackerBenchmark.packDebug` | `ms/op` | 7.210 | ±0.643 | 20 |
+| `MeshPackerBenchmark.packRealtime` | `ms/op` | 7.394 | ±0.739 | 20 |
+| `MeshPipelineBenchmark.realtimePipeline` | `ms/op` | 165.614 | ±1.540 | 20 |
+| `OptimizeVertexCacheBenchmark.optimizeAndMeasureAcmr` | `ms/op` | 302.115 | ±4.410 | 20 |
+
+Focused packer-only run (`JMH_FILTER='.*MeshPackerBenchmark.*'`, `-f 3 -wi 8 -i 15 -prof gc`) produced a stable `packRealtime` of `5.356 ± 0.015 ms/op`.
 
 Notes:
-- Default benchmark profile uses in-process mode (`-f 0`) for sandbox compatibility.
-- For publishable/perf-regression baselines, run outside sandbox with `-Djmh.forks=1` (or higher).
+- For publishable/perf-regression baselines, run outside sandbox with forks (`JMH_FORKS>=1`).
+- Broader suite runs can show more variance; use focused runs for baseline refresh on specific benchmarks.
 
 How to read the table:
 - `Units`: `ms/op` means milliseconds per benchmark operation (lower is faster).
