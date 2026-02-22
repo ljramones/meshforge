@@ -37,6 +37,7 @@ public final class MeshViewerApp extends Application {
     private static final double DEFAULT_CAMERA_Z = -8.0;
     private static final double MIN_CAMERA_Z = -0.8;
     private static final double MAX_CAMERA_Z = -300.0;
+    private static final boolean SHOW_WIREFRAME_OVERLAY = true;
 
     private final Group world = new Group();
     private final Rotate rotX = new Rotate(-25, Rotate.X_AXIS);
@@ -142,24 +143,47 @@ public final class MeshViewerApp extends Application {
             // Ensure pack path remains usable from UI flow.
             MeshPacker.pack(mesh, Packers.realtime());
 
-            MeshView view = new MeshView(MeshFxBridge.toTriangleMesh(mesh));
+            var fxMesh = MeshFxBridge.toTriangleMesh(mesh);
+
+            MeshView view = new MeshView(fxMesh);
             view.setMaterial(new PhongMaterial(Color.rgb(210, 218, 232)));
             // Show both winding directions to reduce "invisible mesh" cases from mixed winding.
             view.setCullFace(CullFace.NONE);
             view.setDrawMode(DrawMode.FILL);
             applyFraming(mesh, view);
-
-            world.getChildren().setAll(view);
             int indexCount = mesh.indicesOrNull() == null ? 0 : mesh.indicesOrNull().length;
             int triangleCount = indexCount / 3;
             float radius = mesh.boundsOrNull() == null || mesh.boundsOrNull().sphere() == null
                 ? Float.NaN
                 : mesh.boundsOrNull().sphere().radius();
             float viewRadius = estimateViewRadius(mesh);
+            float[] center = estimateViewCenter(mesh);
+            double scale = TARGET_RADIUS / Math.max(viewRadius, 1.0e-6f);
+
+            if (SHOW_WIREFRAME_OVERLAY) {
+                MeshView wire = new MeshView(fxMesh);
+                wire.setMaterial(new PhongMaterial(Color.color(0.10, 0.10, 0.10)));
+                wire.setCullFace(CullFace.NONE);
+                wire.setDrawMode(DrawMode.LINE);
+                wire.setScaleX(view.getScaleX());
+                wire.setScaleY(view.getScaleY());
+                wire.setScaleZ(view.getScaleZ());
+                wire.setTranslateX(view.getTranslateX());
+                wire.setTranslateY(view.getTranslateY());
+                wire.setTranslateZ(view.getTranslateZ());
+                world.getChildren().setAll(view, wire);
+            } else {
+                world.getChildren().setAll(view);
+            }
+
             status.setText(file.getName() + " | vertices=" + mesh.vertexCount() +
                 " triangles=" + triangleCount + " indices=" + indexCount +
                 " radius=" + String.format("%.4f", radius) +
-                " viewRadius=" + String.format("%.4f", viewRadius));
+                " viewRadius=" + String.format("%.4f", viewRadius) +
+                " center=(" + String.format("%.2f", center[0]) + "," +
+                String.format("%.2f", center[1]) + "," +
+                String.format("%.2f", center[2]) + ")" +
+                " scale=" + String.format("%.6f", scale));
         } catch (Exception ex) {
             status.setText("Load failed: " + ex.getClass().getSimpleName() + ": " + ex.getMessage());
             ex.printStackTrace(System.err);
@@ -205,6 +229,11 @@ public final class MeshViewerApp extends Application {
 
     private static float estimateViewRadius(org.meshforge.core.mesh.MeshData mesh) {
         return estimateViewFrame(mesh).radius;
+    }
+
+    private static float[] estimateViewCenter(org.meshforge.core.mesh.MeshData mesh) {
+        ViewFrame f = estimateViewFrame(mesh);
+        return new float[] {f.centerX, f.centerY, f.centerZ};
     }
 
     private static ViewFrame estimateViewFrame(org.meshforge.core.mesh.MeshData mesh) {
