@@ -19,12 +19,22 @@ public final class PhaseSplitDiff {
 
     public static void main(String[] args) throws Exception {
         if (args.length < 2) {
-            System.out.println("Usage: PhaseSplitDiff <baseline.csv> <current.csv>");
+            System.out.println("Usage: PhaseSplitDiff <baseline.csv> <current.csv> [--max-regression-pct=<n>] [--fixture=<name-substring>]");
             return;
         }
 
         Path baseline = Path.of(args[0]);
         Path current = Path.of(args[1]);
+        Double maxRegressionPct = null;
+        String fixtureFilter = null;
+        for (int i = 2; i < args.length; i++) {
+            String arg = args[i];
+            if (arg.startsWith("--max-regression-pct=")) {
+                maxRegressionPct = Double.parseDouble(arg.substring("--max-regression-pct=".length()));
+            } else if (arg.startsWith("--fixture=")) {
+                fixtureFilter = arg.substring("--fixture=".length()).trim().toLowerCase(Locale.ROOT);
+            }
+        }
 
         Map<String, Row> left = loadCsv(baseline);
         Map<String, Row> right = loadCsv(current);
@@ -32,7 +42,9 @@ public final class PhaseSplitDiff {
         List<String> fixtures = new ArrayList<>();
         for (String f : left.keySet()) {
             if (right.containsKey(f)) {
-                fixtures.add(f);
+                if (fixtureFilter == null || f.toLowerCase(Locale.ROOT).contains(fixtureFilter)) {
+                    fixtures.add(f);
+                }
             }
         }
         fixtures.sort(Comparator.comparingDouble((String f) -> pct(right.get(f).totalMedianUs, left.get(f).totalMedianUs)).reversed());
@@ -47,6 +59,7 @@ public final class PhaseSplitDiff {
 
         int slower = 0;
         int faster = 0;
+        int gateFailures = 0;
         for (String fixture : fixtures) {
             Row b = left.get(fixture);
             Row c = right.get(fixture);
@@ -87,10 +100,28 @@ public final class PhaseSplitDiff {
                     facePct
                 );
             }
+
+            if (maxRegressionPct != null && totalPct > maxRegressionPct) {
+                gateFailures++;
+                System.out.printf(
+                    Locale.ROOT,
+                    "  GATE FAIL: total regression %.2f%% exceeds limit %.2f%%%n",
+                    totalPct,
+                    maxRegressionPct
+                );
+            }
         }
 
         System.out.println();
         System.out.printf(Locale.ROOT, "Matched fixtures: %d (faster: %d, slower: %d)%n", fixtures.size(), faster, slower);
+        if (maxRegressionPct != null) {
+            if (gateFailures > 0) {
+                System.out.printf(Locale.ROOT, "Regression gate FAILED: %d fixture(s) exceeded %.2f%%%n", gateFailures, maxRegressionPct);
+                System.exit(2);
+            } else {
+                System.out.printf(Locale.ROOT, "Regression gate PASSED: no fixture exceeded %.2f%%%n", maxRegressionPct);
+            }
+        }
     }
 
     private static Map<String, Row> loadCsv(Path csv) throws IOException {

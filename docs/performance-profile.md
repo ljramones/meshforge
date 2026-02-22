@@ -173,6 +173,7 @@ Parse-only loop for loader optimization (Part 2):
 mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast --parse-only --fixture=RevitHouse --warmup=5 --runs=15" exec:java
 mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast --parse-only --profile-parse --fixture=RevitHouse --warmup=5 --runs=15" exec:java
 mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitDiff -Dexec.args="perf/results/phase-split-fast-OLD.csv perf/results/phase-split-fast-NEW.csv" exec:java
+mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitDiff -Dexec.args="perf/results/phase-split-fast-OLD.csv perf/results/phase-split-fast-NEW.csv --max-regression-pct=10 --fixture=RevitHouse" exec:java
 ```
 
 Pack breakdown outputs CSV to `perf/results/pack-breakdown-*.csv`.

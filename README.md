@@ -390,6 +390,8 @@ mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTimi
 mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast --parse-only --profile-parse --fixture=RevitHouse --warmup=5 --runs=15" exec:java
 # compare two phase-split CSV snapshots
 mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitDiff -Dexec.args="perf/results/phase-split-fast-OLD.csv perf/results/phase-split-fast-NEW.csv" exec:java
+# compare with regression gate (fails if total delta > 10%)
+mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitDiff -Dexec.args="perf/results/phase-split-fast-OLD.csv perf/results/phase-split-fast-NEW.csv --max-regression-pct=10 --fixture=RevitHouse" exec:java
 ```
 
 Latest fast-loader snapshot (February 22, 2026, local machine run):
