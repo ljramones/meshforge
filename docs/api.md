@@ -29,7 +29,7 @@ MeshForge is organized around three user-facing stages:
 Planned op categories:
 - validate/repair
 - generate (normals/tangents/bounds)
-- modify (weld/triangulate)
+- modify (weld; triangulate planned)
 - optimize (cache reorder/compaction)
 
 ### Packing (`org.meshforge.pack.*`)

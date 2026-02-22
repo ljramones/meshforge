@@ -88,7 +88,7 @@ v1 rule: allow in-place mutation for performance, but document behavior clearly 
 ### v1 operations
 - validate/repair: schema checks, index range checks, optional degenerate cleanup
 - generate: normals, tangents, bounds
-- modify: weld/deduplicate, optional triangulate
+- modify: weld/deduplicate (triangulate planned)
 - optimize: vertex cache reorder, optional compaction/reindex
 
 Optional `Ops` façade exposes operation factories.
