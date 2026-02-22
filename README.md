@@ -118,6 +118,12 @@ Future feature planning is tracked in:
 docs/roadmap.md
 ```
 
+Cross-library ownership boundaries (Vectrix, MeshForge, DynamisLightEngine) are defined in:
+
+```
+docs/adr/0001-library-boundaries.md
+```
+
 Loader format rollout planning is tracked in:
 
 ```
@@ -198,6 +204,22 @@ Render backends should live outside MeshForge.
 * Explicit packing policies
 * Renderer-agnostic core
 * Performance-focused hot path
+
+## Library Boundaries
+
+MeshForge sits between Vectrix and DynamisLightEngine with explicit ownership:
+
+| Library | Owns | Must not own |
+|---|---|---|
+| `vectrix` | math primitives, SIMD/SoA kernels, numeric packing helpers | mesh topology/pipeline, materials, render APIs |
+| `meshforge` | mesh authoring (`MeshData`), mesh ops, packing (`PackedMesh`, meshlets) | lighting/material systems, render graph/passes, direct Vulkan/OpenGL calls |
+| `dynamislightengine` | scene/render orchestration, materials/lights, shader/pipeline binding | reimplementation of MeshForge mesh ops or Vectrix math kernels |
+
+PR smell checks:
+
+- Math duplicated outside `vectrix`.
+- Mesh processing duplicated outside `meshforge`.
+- Rendering API logic introduced into `meshforge`.
 
 ---
 
