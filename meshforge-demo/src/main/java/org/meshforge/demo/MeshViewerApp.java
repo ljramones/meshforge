@@ -34,14 +34,16 @@ import java.util.Arrays;
 public final class MeshViewerApp extends Application {
     private static final String[] SUPPORTED_EXT = new String[] {"*.obj", "*.stl", "*.ply", "*.off"};
     private static final double TARGET_RADIUS = 2.0;
+    private static final double DEFAULT_ROT_X = -25.0;
+    private static final double DEFAULT_ROT_Y = 30.0;
     private static final double DEFAULT_CAMERA_Z = -8.0;
     private static final double MIN_CAMERA_Z = -0.8;
     private static final double MAX_CAMERA_Z = -300.0;
     private static final boolean SHOW_WIREFRAME_OVERLAY = true;
 
     private final Group world = new Group();
-    private final Rotate rotX = new Rotate(-25, Rotate.X_AXIS);
-    private final Rotate rotY = new Rotate(30, Rotate.Y_AXIS);
+    private final Rotate rotX = new Rotate(DEFAULT_ROT_X, Rotate.X_AXIS);
+    private final Rotate rotY = new Rotate(DEFAULT_ROT_Y, Rotate.Y_AXIS);
     private PerspectiveCamera camera;
     private Label status;
 
@@ -171,6 +173,7 @@ public final class MeshViewerApp extends Application {
             float[] center = estimateViewCenter(mesh);
             double scale = TARGET_RADIUS / Math.max(viewRadius, 1.0e-6f);
             world.getChildren().setAll(meshGroup);
+            double camZ = camera == null ? Double.NaN : camera.getTranslateZ();
 
             status.setText(file.getName() + " | vertices=" + mesh.vertexCount() +
                 " triangles=" + triangleCount + " indices=" + indexCount +
@@ -180,7 +183,8 @@ public final class MeshViewerApp extends Application {
                 " center=(" + String.format("%.2f", center[0]) + "," +
                 String.format("%.2f", center[1]) + "," +
                 String.format("%.2f", center[2]) + ")" +
-                " scale=" + String.format("%.6f", scale));
+                " scale=" + String.format("%.6f", scale) +
+                " camZ=" + String.format("%.3f", camZ));
         } catch (Exception ex) {
             status.setText("Load failed: " + ex.getClass().getSimpleName() + ": " + ex.getMessage());
             ex.printStackTrace(System.err);
@@ -203,18 +207,22 @@ public final class MeshViewerApp extends Application {
         float cz = frame.centerZ;
         float radius = Math.max(frame.radius, 1.0e-6f);
 
-        double scale = TARGET_RADIUS / radius;
-        meshNode.setScaleX(scale);
-        meshNode.setScaleY(scale);
-        meshNode.setScaleZ(scale);
-        meshNode.setTranslateX(-cx * scale);
-        meshNode.setTranslateY(-cy * scale);
-        meshNode.setTranslateZ(-cz * scale);
+        meshNode.setScaleX(1.0);
+        meshNode.setScaleY(1.0);
+        meshNode.setScaleZ(1.0);
+        meshNode.setTranslateX(-cx);
+        meshNode.setTranslateY(-cy);
+        meshNode.setTranslateZ(-cz);
         world.setTranslateX(0.0);
         world.setTranslateY(0.0);
+        rotX.setAngle(DEFAULT_ROT_X);
+        rotY.setAngle(DEFAULT_ROT_Y);
 
         if (camera != null) {
-            camera.setTranslateZ(DEFAULT_CAMERA_Z);
+            double halfFovRad = Math.toRadians(Math.max(1.0, camera.getFieldOfView()) * 0.5);
+            double fitDistance = (radius / Math.tan(halfFovRad)) * 1.15;
+            double nextZ = -Math.max(2.0, fitDistance);
+            camera.setTranslateZ(nextZ);
             camera.setNearClip(0.01);
             camera.setFarClip(100_000.0);
         }
