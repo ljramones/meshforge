@@ -352,22 +352,24 @@ mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.BaselineFixtureTiming
 ```
 
 Definitions:
-- `Load ms`: file read + parse into `MeshData` (`MeshLoaders.defaults().load(...)`)
-- `Create ms`: mesh runtime prep (`Pipelines.realtimeFast(...)` + `MeshPacker.pack(..., Packers.realtime())`)
+- `Load ms (median)`: median of 3 timing passes for file read + parse into `MeshData` (`MeshLoaders.defaults().load(...)`)
+- `Create ms (median)`: median of 3 timing passes for mesh runtime prep (`Pipelines.realtimeFast(...)` + `MeshPacker.pack(..., Packers.realtime())`)
+- `Load ms / 1M verts`: normalized loader cost by vertex count
+- `Create ms / 1M tris`: normalized creation cost by triangle count
 
 Snapshot (February 21, 2026, local machine run):
 
-| Fixture | Load ms (avg) | Create ms (avg) | Vertices | Triangles |
-|---|---:|---:|---:|---:|
-| `beast.obj` | 44.967 | 3.790 | 32311 | 64618 |
-| `cow.obj` | 2.984 | 0.340 | 2903 | 5804 |
-| `lucy.obj` | 57.453 | 4.156 | 49987 | 99970 |
-| `nefertiti.obj` | 48.478 | 4.010 | 49971 | 99938 |
-| `RevitHouse.obj` | 697.644 | 98.914 | 1242180 | 412119 |
-| `stanford-bunny.obj` | 28.193 | 2.994 | 35947 | 69451 |
-| `suzanne.obj` | 0.438 | 0.058 | 507 | 968 |
-| `teapot.obj` | 2.495 | 0.331 | 3644 | 6320 |
-| `xyzrgb_dragon.obj` | 152.676 | 10.852 | 125066 | 249882 |
+| Fixture | Load ms (median) | Create ms (median) | Load ms / 1M verts | Create ms / 1M tris | Vertices | Triangles |
+|---|---:|---:|---:|---:|---:|---:|
+| `beast.obj` | 33.433 | 3.296 | 1034.713 | 51.010 | 32311 | 64618 |
+| `cow.obj` | 2.214 | 0.270 | 762.814 | 46.484 | 2903 | 5804 |
+| `lucy.obj` | 55.291 | 4.270 | 1106.115 | 42.709 | 49987 | 99970 |
+| `nefertiti.obj` | 47.096 | 4.083 | 942.463 | 40.856 | 49971 | 99938 |
+| `RevitHouse.obj` | 706.319 | 97.479 | 568.613 | 236.532 | 1242180 | 412119 |
+| `stanford-bunny.obj` | 28.315 | 3.169 | 787.685 | 45.632 | 35947 | 69451 |
+| `suzanne.obj` | 0.430 | 0.061 | 848.028 | 63.421 | 507 | 968 |
+| `teapot.obj` | 2.581 | 0.346 | 708.288 | 54.726 | 3644 | 6320 |
+| `xyzrgb_dragon.obj` | 141.936 | 10.697 | 1134.888 | 42.808 | 125066 | 249882 |
 
 These are fixture-level throughput indicators and will vary by CPU/JVM/load.
 

@@ -19,6 +19,7 @@ import java.util.Locale;
 public final class BaselineFixtureTiming {
     private static final int WARMUP = 2;
     private static final int ROUNDS = 5;
+    private static final int PASSES = 3;
 
     private BaselineFixtureTiming() {
     }
@@ -47,15 +48,17 @@ public final class BaselineFixtureTiming {
             rows.add(timeOne(loaders, file));
         }
 
-        System.out.println("| Fixture | Load ms (avg) | Create ms (avg) | Vertices | Triangles |");
-        System.out.println("|---|---:|---:|---:|---:|");
+        System.out.println("| Fixture | Load ms (median) | Create ms (median) | Load ms / 1M verts | Create ms / 1M tris | Vertices | Triangles |");
+        System.out.println("|---|---:|---:|---:|---:|---:|---:|");
         for (Row row : rows) {
             System.out.printf(
                 Locale.ROOT,
-                "| `%s` | %.3f | %.3f | %d | %d |%n",
+                "| `%s` | %.3f | %.3f | %.3f | %.3f | %d | %d |%n",
                 row.name,
                 row.loadMs,
                 row.createMs,
+                row.loadMsPerMillionVertices,
+                row.createMsPerMillionTriangles,
                 row.vertices,
                 row.triangles
             );
@@ -63,50 +66,81 @@ public final class BaselineFixtureTiming {
     }
 
     private static Row timeOne(MeshLoaders loaders, Path file) throws IOException {
-        for (int i = 0; i < WARMUP; i++) {
-            loaders.load(file);
-            var mesh = loaders.load(file);
-            mesh = Pipelines.realtimeFast(mesh);
-            MeshPacker.pack(mesh, Packers.realtime());
-        }
-
-        double loadNsTotal = 0.0;
-        for (int i = 0; i < ROUNDS; i++) {
-            long start = System.nanoTime();
-            loaders.load(file);
-            long end = System.nanoTime();
-            loadNsTotal += (end - start);
-        }
-
-        double createNsTotal = 0.0;
+        double[] loadMsPass = new double[PASSES];
+        double[] createMsPass = new double[PASSES];
         int vertices = 0;
         int triangles = 0;
-        for (int i = 0; i < ROUNDS; i++) {
-            var mesh = loaders.load(file);
-            long start = System.nanoTime();
-            mesh = Pipelines.realtimeFast(mesh);
-            MeshPacker.pack(mesh, Packers.realtime());
-            long end = System.nanoTime();
-            createNsTotal += (end - start);
 
-            vertices = mesh.vertexCount();
-            int indexCount = mesh.indicesOrNull() == null ? 0 : mesh.indicesOrNull().length;
-            triangles = indexCount / 3;
+        for (int pass = 0; pass < PASSES; pass++) {
+            for (int i = 0; i < WARMUP; i++) {
+                loaders.load(file);
+                var mesh = loaders.load(file);
+                mesh = Pipelines.realtimeFast(mesh);
+                MeshPacker.pack(mesh, Packers.realtime());
+            }
+
+            double loadNsTotal = 0.0;
+            for (int i = 0; i < ROUNDS; i++) {
+                long start = System.nanoTime();
+                loaders.load(file);
+                long end = System.nanoTime();
+                loadNsTotal += (end - start);
+            }
+
+            double createNsTotal = 0.0;
+            for (int i = 0; i < ROUNDS; i++) {
+                var mesh = loaders.load(file);
+                long start = System.nanoTime();
+                mesh = Pipelines.realtimeFast(mesh);
+                MeshPacker.pack(mesh, Packers.realtime());
+                long end = System.nanoTime();
+                createNsTotal += (end - start);
+
+                vertices = mesh.vertexCount();
+                int indexCount = mesh.indicesOrNull() == null ? 0 : mesh.indicesOrNull().length;
+                triangles = indexCount / 3;
+            }
+
+            loadMsPass[pass] = loadNsTotal / ROUNDS / 1_000_000.0;
+            createMsPass[pass] = createNsTotal / ROUNDS / 1_000_000.0;
         }
+
+        double loadMsMedian = median(loadMsPass);
+        double createMsMedian = median(createMsPass);
+        double loadMsPerMillionVertices = vertices == 0
+            ? 0.0
+            : loadMsMedian / (vertices / 1_000_000.0);
+        double createMsPerMillionTriangles = triangles == 0
+            ? 0.0
+            : createMsMedian / (triangles / 1_000_000.0);
 
         return new Row(
             file.getFileName().toString(),
-            loadNsTotal / ROUNDS / 1_000_000.0,
-            createNsTotal / ROUNDS / 1_000_000.0,
+            loadMsMedian,
+            createMsMedian,
+            loadMsPerMillionVertices,
+            createMsPerMillionTriangles,
             vertices,
             triangles
         );
+    }
+
+    private static double median(double[] values) {
+        double[] copy = values.clone();
+        java.util.Arrays.sort(copy);
+        int mid = copy.length / 2;
+        if ((copy.length % 2) == 1) {
+            return copy[mid];
+        }
+        return (copy[mid - 1] + copy[mid]) * 0.5;
     }
 
     private record Row(
         String name,
         double loadMs,
         double createMs,
+        double loadMsPerMillionVertices,
+        double createMsPerMillionTriangles,
         int vertices,
         int triangles
     ) {
