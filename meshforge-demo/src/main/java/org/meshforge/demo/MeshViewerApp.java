@@ -176,10 +176,11 @@ public final class MeshViewerApp extends Application {
             return;
         }
 
-        float cx = bounds.sphere().centerX();
-        float cy = bounds.sphere().centerY();
-        float cz = bounds.sphere().centerZ();
-        float radius = Math.max(estimateViewRadius(mesh), 1.0e-6f);
+        ViewFrame frame = estimateViewFrame(mesh);
+        float cx = frame.centerX;
+        float cy = frame.centerY;
+        float cz = frame.centerZ;
+        float radius = Math.max(frame.radius, 1.0e-6f);
 
         double scale = TARGET_RADIUS / radius;
         view.setScaleX(scale);
@@ -203,42 +204,88 @@ public final class MeshViewerApp extends Application {
     }
 
     private static float estimateViewRadius(org.meshforge.core.mesh.MeshData mesh) {
+        return estimateViewFrame(mesh).radius;
+    }
+
+    private static ViewFrame estimateViewFrame(org.meshforge.core.mesh.MeshData mesh) {
         var bounds = mesh.boundsOrNull();
         if (bounds == null || bounds.sphere() == null || !mesh.has(AttributeSemantic.POSITION, 0)) {
-            return 1.0f;
+            return new ViewFrame(0.0f, 0.0f, 0.0f, 1.0f);
         }
 
-        float centerX = bounds.sphere().centerX();
-        float centerY = bounds.sphere().centerY();
-        float centerZ = bounds.sphere().centerZ();
+        float fallbackCx = bounds.sphere().centerX();
+        float fallbackCy = bounds.sphere().centerY();
+        float fallbackCz = bounds.sphere().centerZ();
+        float fallbackRadius = Math.max(bounds.sphere().radius(), 1.0e-6f);
+
         float[] positions = mesh.attribute(AttributeSemantic.POSITION, 0).rawFloatArrayOrNull();
         if (positions == null || positions.length < 3) {
-            return Math.max(bounds.sphere().radius(), 1.0f);
+            return new ViewFrame(fallbackCx, fallbackCy, fallbackCz, fallbackRadius);
         }
 
         int vertexCount = positions.length / 3;
         int step = Math.max(1, vertexCount / 4096);
         int sampleCount = (vertexCount + step - 1) / step;
-        float[] distances = new float[sampleCount];
+        float[] xs = new float[sampleCount];
+        float[] ys = new float[sampleCount];
+        float[] zs = new float[sampleCount];
 
         int s = 0;
         for (int v = 0; v < vertexCount; v += step) {
             int p = v * 3;
-            float dx = positions[p] - centerX;
-            float dy = positions[p + 1] - centerY;
-            float dz = positions[p + 2] - centerZ;
-            distances[s++] = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+            float x = positions[p];
+            float y = positions[p + 1];
+            float z = positions[p + 2];
+            if (!Float.isFinite(x) || !Float.isFinite(y) || !Float.isFinite(z)) {
+                continue;
+            }
+            xs[s] = x;
+            ys[s] = y;
+            zs[s] = z;
+            s++;
         }
-        Arrays.sort(distances, 0, s);
+        if (s == 0) {
+            return new ViewFrame(fallbackCx, fallbackCy, fallbackCz, fallbackRadius);
+        }
+        Arrays.sort(xs, 0, s);
+        Arrays.sort(ys, 0, s);
+        Arrays.sort(zs, 0, s);
+        float centerX = xs[(s - 1) / 2];
+        float centerY = ys[(s - 1) / 2];
+        float centerZ = zs[(s - 1) / 2];
+
+        float[] distances = new float[s];
+        for (int i = 0; i < s; i++) {
+            float dx = xs[i] - centerX;
+            float dy = ys[i] - centerY;
+            float dz = zs[i] - centerZ;
+            distances[i] = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+        }
+        Arrays.sort(distances);
 
         float p90 = distances[Math.max(0, (int) Math.floor((s - 1) * 0.90f))];
+        float p95 = distances[Math.max(0, (int) Math.floor((s - 1) * 0.95f))];
         float p99 = distances[Math.max(0, (int) Math.floor((s - 1) * 0.99f))];
         float max = distances[s - 1];
 
         // If a few outliers dominate the radius, frame to p99 for visibility.
         if (p99 > 0.0f && max > p99 * 4.0f) {
-            return Math.max(p99, 1.0e-6f);
+            return new ViewFrame(centerX, centerY, centerZ, Math.max(p99, 1.0e-6f));
         }
-        return Math.max(p90, 1.0e-6f);
+        return new ViewFrame(centerX, centerY, centerZ, Math.max(p95 > 0.0f ? p95 : p90, 1.0e-6f));
+    }
+
+    private static final class ViewFrame {
+        final float centerX;
+        final float centerY;
+        final float centerZ;
+        final float radius;
+
+        ViewFrame(float centerX, float centerY, float centerZ, float radius) {
+            this.centerX = centerX;
+            this.centerY = centerY;
+            this.centerZ = centerZ;
+            this.radius = radius;
+        }
     }
 }
