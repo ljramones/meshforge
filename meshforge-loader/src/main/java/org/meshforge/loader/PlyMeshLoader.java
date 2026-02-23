@@ -59,8 +59,19 @@ public final class PlyMeshLoader {
         if (!ascii) {
             throw new IOException("Only ASCII PLY is supported in v1");
         }
+        if (vertexCount < 0 || faceCount < 0) {
+            throw new IOException("PLY counts must be >= 0");
+        }
+        if (vertexCount == Integer.MAX_VALUE) {
+            throw new IOException("PLY vertexCount exceeds supported limit: " + vertexCount);
+        }
 
-        float[] positions = new float[vertexCount * 3];
+        final float[] positions;
+        try {
+            positions = new float[Math.multiplyExact(vertexCount, 3)];
+        } catch (ArithmeticException ex) {
+            throw new IOException("PLY vertex buffer size overflow for vertexCount=" + vertexCount, ex);
+        }
         for (int i = 0; i < vertexCount; i++) {
             line = br.readLine();
             if (line == null) {
@@ -101,7 +112,9 @@ public final class PlyMeshLoader {
             }
         }
 
-        return createMesh(positions, toIntArray(indexList));
+        int[] indices = toIntArray(indexList);
+        validateIndices(indices, vertexCount);
+        return createMesh(positions, indices);
     }
 
     private static MeshData createMesh(float[] positions, int[] indices) {
@@ -132,5 +145,14 @@ public final class PlyMeshLoader {
             out[i] = values.get(i);
         }
         return out;
+    }
+
+    private static void validateIndices(int[] indices, int vertexCount) throws IOException {
+        for (int i = 0; i < indices.length; i++) {
+            int index = indices[i];
+            if (index < 0 || index >= vertexCount) {
+                throw new IOException("PLY face index out of bounds at " + i + ": " + index + " (vertexCount=" + vertexCount + ")");
+            }
+        }
     }
 }

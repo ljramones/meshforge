@@ -13,6 +13,15 @@ public final class MeshWriter {
     private final MeshData mesh;
 
     public MeshWriter(VertexSchema schema, int vertexCount, int indexCount) {
+        if (vertexCount == Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("vertexCount exceeds supported limit: " + vertexCount);
+        }
+        if (indexCount == Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("indexCount exceeds supported limit: " + indexCount);
+        }
+        if (indexCount < 0) {
+            throw new IllegalArgumentException("indexCount must be >= 0");
+        }
         int[] indices = indexCount <= 0 ? null : new int[indexCount];
         List<Submesh> submeshes = indices == null
             ? List.of()

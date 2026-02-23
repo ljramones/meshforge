@@ -22,9 +22,11 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.logging.Logger;
 
 public final class MeshPacker {
     private static final int PROFILE_SAMPLE_RATE = 1024;
+    private static final Logger LOGGER = Logger.getLogger(MeshPacker.class.getName());
 
     private MeshPacker() {
     }
@@ -40,6 +42,9 @@ public final class MeshPacker {
         long totalStart = profile == null ? 0L : System.nanoTime();
         if (spec.layoutMode() != PackSpec.LayoutMode.INTERLEAVED) {
             throw new UnsupportedOperationException("v1 supports INTERLEAVED only");
+        }
+        if (!mesh.morphTargets().isEmpty()) {
+            LOGGER.warning("Morph targets are present on MeshData but are not packed in v1; packing base mesh only.");
         }
 
         long resolveStart = profile == null ? 0L : System.nanoTime();
@@ -110,7 +115,14 @@ public final class MeshPacker {
         long uvPackNs = 0L;
         long colorPackNs = 0L;
         long skinPackNs = 0L;
-        ByteBuffer vertexBuffer = ByteBuffer.allocateDirect(vertexCount * stride).order(ByteOrder.LITTLE_ENDIAN);
+        final ByteBuffer vertexBuffer;
+        try {
+            int vertexBufferBytes = Math.multiplyExact(vertexCount, stride);
+            vertexBuffer = ByteBuffer.allocateDirect(vertexBufferBytes).order(ByteOrder.LITTLE_ENDIAN);
+        } catch (ArithmeticException ex) {
+            throw new IllegalStateException(
+                "Vertex buffer size overflow: vertexCount=" + vertexCount + ", stride=" + stride, ex);
+        }
 
         float[] positionData = requireFloat(position, "POSITION");
         float[] normalData = normal == null ? null : normal.rawFloatArrayOrNull();
@@ -141,9 +153,12 @@ public final class MeshPacker {
         boolean hasTangent = tangentData != null && tangentOff >= 0;
         boolean hasUv = uvData != null && uvOff >= 0;
         boolean hasColor = colorData != null && colorOff >= 0;
-        boolean hasJoints = jointsData != null && jointsOff >= 0;
+        boolean hasJoints = joints0 != null && jointsOff >= 0;
         boolean hasWeights = weightsData != null && weightsOff >= 0;
         VertexFormat normalFormat = normalEntry == null ? null : normalEntry.format();
+        if (posEntry == null) {
+            throw new IllegalStateException("PackSpec must include target format for POSITION[0]");
+        }
 
         boolean hotPosNormalLayout = posOff == 0 && normalOff == 12 && stride == 16;
         boolean hotPosOnlyLayout = posOff == 0 && stride == 16;
@@ -203,7 +218,7 @@ public final class MeshPacker {
                     vertexBuffer.putFloat(base + posOff + 8, positionData[p + 2]);
                 }
             }
-        } else {
+        } else if (profileEnabled) {
             long posSamples = 0L;
             long normalSamples = 0L;
             long tangentSamples = 0L;
@@ -281,11 +296,19 @@ public final class MeshPacker {
 
                 if (hasJoints) {
                     long sectionStart = sampleThisVertex ? System.nanoTime() : 0L;
-                    int src = i * 4;
-                    int packed = (jointsData[src] & 0xFF)
-                        | ((jointsData[src + 1] & 0xFF) << 8)
-                        | ((jointsData[src + 2] & 0xFF) << 16)
-                        | ((jointsData[src + 3] & 0xFF) << 24);
+                    int packed;
+                    if (jointsData != null) {
+                        int src = i * 4;
+                        packed = (jointsData[src] & 0xFF)
+                            | ((jointsData[src + 1] & 0xFF) << 8)
+                            | ((jointsData[src + 2] & 0xFF) << 16)
+                            | ((jointsData[src + 3] & 0xFF) << 24);
+                    } else {
+                        packed = (joints0.getInt(i, 0) & 0xFF)
+                            | ((joints0.getInt(i, 1) & 0xFF) << 8)
+                            | ((joints0.getInt(i, 2) & 0xFF) << 16)
+                            | ((joints0.getInt(i, 3) & 0xFF) << 24);
+                    }
                     vertexBuffer.putInt(base + jointsOff, packed);
                     if (sampleThisVertex) {
                         skinPackNs += System.nanoTime() - sectionStart;
@@ -313,6 +336,28 @@ public final class MeshPacker {
                 uvPackNs = scaleSampledNs(uvPackNs, uvSamples, vertexCount);
                 colorPackNs = scaleSampledNs(colorPackNs, colorSamples, vertexCount);
                 skinPackNs = scaleSampledNs(skinPackNs, skinSamples, vertexCount);
+            }
+        } else {
+            if (posOff >= 0) {
+                writePositionPass(vertexBuffer, positionData, vertexCount, stride, posOff);
+            }
+            if (hasNormal) {
+                writeNormalPass(vertexBuffer, normalData, vertexCount, stride, normalOff, normalFormat);
+            }
+            if (hasTangent) {
+                writeTangentPass(vertexBuffer, tangentData, vertexCount, stride, tangentOff);
+            }
+            if (hasUv) {
+                writeUvPass(vertexBuffer, uvData, vertexCount, stride, uvOff);
+            }
+            if (hasColor) {
+                writeColorPass(vertexBuffer, colorData, vertexCount, stride, colorOff);
+            }
+            if (hasJoints) {
+                writeJointsPass(vertexBuffer, jointsData, joints0, vertexCount, stride, jointsOff);
+            }
+            if (hasWeights) {
+                writeWeightsPass(vertexBuffer, weightsData, vertexCount, stride, weightsOff);
             }
         }
         if (profile != null) {
@@ -381,6 +426,102 @@ public final class MeshPacker {
         return offset + format.bytesPerVertex();
     }
 
+    private static void writePositionPass(ByteBuffer out, float[] positionData, int vertexCount, int stride, int offset) {
+        for (int i = 0, src = 0; i < vertexCount; i++, src += 3) {
+            int base = (i * stride) + offset;
+            out.putFloat(base, positionData[src]);
+            out.putFloat(base + 4, positionData[src + 1]);
+            out.putFloat(base + 8, positionData[src + 2]);
+        }
+    }
+
+    private static void writeNormalPass(
+        ByteBuffer out,
+        float[] normalData,
+        int vertexCount,
+        int stride,
+        int offset,
+        VertexFormat normalFormat
+    ) {
+        if (SimdNormalPacker.isEnabled()
+            && (normalFormat == VertexFormat.OCTA_SNORM16x2 || normalFormat == VertexFormat.SNORM8x4)) {
+            int[] packed = new int[vertexCount];
+            if (normalFormat == VertexFormat.OCTA_SNORM16x2) {
+                SimdNormalPacker.packOctaNormals(normalData, vertexCount, packed);
+            } else {
+                SimdNormalPacker.packSnorm8Normals(normalData, vertexCount, packed);
+            }
+            for (int i = 0; i < vertexCount; i++) {
+                out.putInt((i * stride) + offset, packed[i]);
+            }
+            return;
+        }
+
+        for (int i = 0, src = 0; i < vertexCount; i++, src += 3) {
+            writeNormal(out, (i * stride) + offset, normalFormat, normalData[src], normalData[src + 1], normalData[src + 2]);
+        }
+    }
+
+    private static void writeTangentPass(ByteBuffer out, float[] tangentData, int vertexCount, int stride, int offset) {
+        for (int i = 0, src = 0; i < vertexCount; i++, src += 4) {
+            int packed = packSnorm8x4Inline(
+                tangentData[src], tangentData[src + 1], tangentData[src + 2], tangentData[src + 3]);
+            out.putInt((i * stride) + offset, packed);
+        }
+    }
+
+    private static void writeUvPass(ByteBuffer out, float[] uvData, int vertexCount, int stride, int offset) {
+        for (int i = 0, src = 0; i < vertexCount; i++, src += 2) {
+            int base = (i * stride) + offset;
+            out.putShort(base, Half.pack(uvData[src]));
+            out.putShort(base + 2, Half.pack(uvData[src + 1]));
+        }
+    }
+
+    private static void writeColorPass(ByteBuffer out, float[] colorData, int vertexCount, int stride, int offset) {
+        for (int i = 0, src = 0; i < vertexCount; i++, src += 4) {
+            int packed = PackedNorm.packUnorm8x4(
+                colorData[src], colorData[src + 1], colorData[src + 2], colorData[src + 3]);
+            out.putInt((i * stride) + offset, packed);
+        }
+    }
+
+    private static void writeJointsPass(
+        ByteBuffer out,
+        int[] jointsData,
+        VertexAttributeView jointsView,
+        int vertexCount,
+        int stride,
+        int offset
+    ) {
+        if (jointsData != null) {
+            for (int i = 0, src = 0; i < vertexCount; i++, src += 4) {
+                int packed = (jointsData[src] & 0xFF)
+                    | ((jointsData[src + 1] & 0xFF) << 8)
+                    | ((jointsData[src + 2] & 0xFF) << 16)
+                    | ((jointsData[src + 3] & 0xFF) << 24);
+                out.putInt((i * stride) + offset, packed);
+            }
+            return;
+        }
+
+        for (int i = 0; i < vertexCount; i++) {
+            int packed = (jointsView.getInt(i, 0) & 0xFF)
+                | ((jointsView.getInt(i, 1) & 0xFF) << 8)
+                | ((jointsView.getInt(i, 2) & 0xFF) << 16)
+                | ((jointsView.getInt(i, 3) & 0xFF) << 24);
+            out.putInt((i * stride) + offset, packed);
+        }
+    }
+
+    private static void writeWeightsPass(ByteBuffer out, float[] weightsData, int vertexCount, int stride, int offset) {
+        for (int i = 0, src = 0; i < vertexCount; i++, src += 4) {
+            int packed = PackedNorm.packUnorm8x4(
+                weightsData[src], weightsData[src + 1], weightsData[src + 2], weightsData[src + 3]);
+            out.putInt((i * stride) + offset, packed);
+        }
+    }
+
     private static int align(int value, int alignment) {
         if (alignment <= 1) {
             return value;
@@ -409,8 +550,14 @@ public final class MeshPacker {
     }
 
     private static PackedMesh.IndexBufferView packIndices(int[] indices, PackSpec.IndexPolicy policy) {
+        if (indices.length == Integer.MAX_VALUE) {
+            throw new IllegalStateException("indexCount exceeds supported limit: " + indices.length);
+        }
         boolean canUse16 = true;
         for (int value : indices) {
+            if (value < 0) {
+                throw new IllegalStateException("Index buffer contains negative index: " + value);
+            }
             if ((value & 0xFFFF0000) != 0) {
                 canUse16 = false;
                 break;
@@ -421,7 +568,12 @@ public final class MeshPacker {
         }
 
         if (canUse16) {
-            ByteBuffer data = ByteBuffer.allocateDirect(indices.length * 2).order(ByteOrder.LITTLE_ENDIAN);
+            final ByteBuffer data;
+            try {
+                data = ByteBuffer.allocateDirect(Math.multiplyExact(indices.length, 2)).order(ByteOrder.LITTLE_ENDIAN);
+            } catch (ArithmeticException ex) {
+                throw new IllegalStateException("Index buffer size overflow for UINT16 with indexCount=" + indices.length, ex);
+            }
             for (int value : indices) {
                 data.putShort((short) value);
             }
@@ -429,7 +581,12 @@ public final class MeshPacker {
             return new PackedMesh.IndexBufferView(PackedMesh.IndexType.UINT16, data, indices.length);
         }
 
-        ByteBuffer data = ByteBuffer.allocateDirect(indices.length * 4).order(ByteOrder.LITTLE_ENDIAN);
+        final ByteBuffer data;
+        try {
+            data = ByteBuffer.allocateDirect(Math.multiplyExact(indices.length, 4)).order(ByteOrder.LITTLE_ENDIAN);
+        } catch (ArithmeticException ex) {
+            throw new IllegalStateException("Index buffer size overflow for UINT32 with indexCount=" + indices.length, ex);
+        }
         for (int value : indices) {
             data.putInt(value);
         }
@@ -452,7 +609,10 @@ public final class MeshPacker {
         if (format == VertexFormat.OCTA_SNORM16x2) {
             return OctaNormal.encodeSnorm16(x, y, z);
         }
-        return packSnorm8x4Inline(x, y, z, 0.0f);
+        if (format == VertexFormat.SNORM8x4) {
+            return packSnorm8x4Inline(x, y, z, 0.0f);
+        }
+        throw new IllegalStateException("Unsupported packed normal format: " + format);
     }
 
     private static void writeNormal(ByteBuffer out, int offset, VertexFormat format, float x, float y, float z) {

@@ -1,189 +1,80 @@
-# MeshForge v1 Architecture
+# MeshForge Architecture
 
-This split is intentional:
-- `MeshData` is optimized for flexibility and clarity.
-- `PackedMesh` is optimized for compact immutable handoff.
+Last updated: 2026-02-23
 
-## Representation 1: MeshData (Authoring Model)
+MeshForge has two representations by design:
 
-### MeshData responsibilities
-`MeshData` represents a semantic, editable mesh form suitable for procedural generation, importers, mesh operations, and tooling.
+- `MeshData`: flexible authoring and processing model
+- `PackedMesh`: immutable runtime handoff model
 
-It contains:
-- `Topology` (TRIANGLES / LINES / POINTS in v1)
-- optional index buffer (expected for triangles)
-- `Submesh[]` draw ranges and material associations
-- `VertexSchema` as the attribute contract
-- attributes stored by semantic (`POSITION`, `NORMAL`, `UV0`, etc.)
+## `MeshData` (authoring model)
 
-### VertexSchema: the attribute contract
-`VertexSchema` defines which attributes exist, their formats (for example `F32x3`, `UNORM8x4`), and set indices (`UV0`, `UV1`, `COLOR0`).
+Responsibilities:
+- semantic attribute model keyed by `(AttributeSemantic, setIndex)`
+- editable topology/index/submesh data
+- operation-friendly storage and mutation
+- optional derived caches (bounds, generated attributes)
 
-Schema drives correctness:
-- ops can require or generate attributes
-- packer can validate formats and convert/compress
+`MeshData` is where importers and mesh ops work.
 
-### VertexAttributeView: stable access without exposing storage
-`VertexAttributeView` provides:
-- typed get/set operations
-- bulk access where appropriate
-- stable API even if storage changes later
+## Pipeline (`MeshOp`)
 
-This allows future implementation shifts (SoA/AoS, on-heap/off-heap) without breaking user code.
+Pipeline shape:
+- `MeshPipeline.run(mesh, op...)`
+- each op can mutate in-place or return a transformed mesh
 
-### Submesh: maps to draw calls
-`Submesh` models draw ranges:
-- `firstIndex`
-- `indexCount`
-- `materialId` (lightweight in v1)
-- optional topology override (typically unnecessary in v1)
+Current high-use ops:
+- validate / remove degenerates
+- weld / compact
+- recalculate normals / tangents
+- optimize vertex cache
+- meshlet clustering and ordering
+- bounds
 
-### Internal storage model (v1)
-`MeshData` uses SoA-by-attribute internally (one primitive array per attribute, keyed by semantic and set index). This is intentional for operation throughput and clean packing boundaries.
+Correctness note:
+- Weld is boundary-safe. It intentionally does neighbor-cell checks to avoid missed merges across quantization cell boundaries.
 
-Detailed implementation guidance lives in `docs/internal-storage.md`.
+## `PackedMesh` (runtime model)
 
-## Mesh Creation APIs
+Responsibilities:
+- immutable buffer-backed geometry payload
+- stable, explicit vertex/index layout contract
+- safe cross-thread sharing and caching
 
-Both creation paths produce `MeshData`.
+Contains:
+- vertex buffer views
+- optional index buffer view
+- layout metadata (`VertexLayout`)
+- submesh ranges
+- bounds
 
-### MeshBuilder (ergonomic)
-For small procedural shapes, debug geometry, tests, and examples.
+## Packing (`MeshPacker` + `PackSpec`)
 
-Focus:
-- fluent construction
-- readability
-- correctness checks
+`MeshPacker.pack(mesh, spec)` is the explicit authoring->runtime conversion boundary.
 
-### MeshWriter (high-throughput)
-For importers and large/performance-sensitive generation.
+Current status:
+- interleaved packing is implemented and production-used
+- multi-stream packing is declared in API but not implemented
+- packer validates required attributes/formats and fails fast for unsupported layout modes
 
-Focus:
-- pre-allocation
-- bulk attribute/index writes
-- minimal per-element overhead
+## Dependency Direction
 
-### Meshes (front door)
-`org.meshforge.api.Meshes` provides convenience factories such as:
-- `Meshes.builder(topology)`
-- `Meshes.writer(schema, counts...)`
-- curated primitives (`cube`, `sphere`, etc.)
+- `vectrix` -> none
+- `meshforge` -> `vectrix`
+- `dynamislightengine` (or other engines) -> `meshforge`, `vectrix`
 
-## Mesh Processing Pipeline (Ops)
+Disallowed:
+- renderer/runtime dependencies in `meshforge/src/main`
 
-### MeshOp
-`MeshData apply(MeshData in, MeshContext ctx)`
+See `docs/boundaries.md` and `docs/adr/0001-library-boundaries.md`.
 
-v1 rule: allow in-place mutation for performance, but document behavior clearly per op.
+## Runtime Integration Boundary
 
-### MeshPipeline
-`MeshPipeline.run(mesh, ops...)` applies operations sequentially.
-
-### MeshContext
-`MeshContext` provides shared scratch resources and settings:
-- temp buffers/maps
-- tolerance/epsilon config
-- optional instrumentation hooks (kept minimal in v1)
-
-### v1 operations
-- validate/repair: schema checks, index range checks, optional degenerate cleanup
-- generate: normals, tangents, bounds
-- modify: weld/deduplicate (triangulate planned)
-- optimize: vertex cache reorder, optional compaction/reindex
-
-Optional `Ops` façade exposes operation factories.
-
-## Representation 2: PackedMesh (Runtime Model)
-
-### PackedMesh responsibilities
-`PackedMesh` is optimized for immutable downstream consumption:
-- immutable
-- layout-defined
-- buffer-backed (`ByteBuffer`/`MemorySegment`)
-- safe to share/cache across threads and systems
-
-It contains:
-- one or more `VertexBufferView` streams
-- optional `IndexBufferView`
-- `VertexLayout` (bindings/offsets/stride)
-- `Submesh[]` ranges
-- computed `Boundsf` (AABB/Sphere)
-
-### Meshlet advantages
-When enabled, meshlets provide a compact cluster representation that improves downstream runtime behavior:
-- better locality (vertex reuse and cache behavior within small clusters)
-- finer visibility granularity (bounds and cone metadata per cluster)
-- descriptor-friendly structure for GPU-driven consumers
-- cleaner path to paging/streaming and compression by cluster
-
-### VertexLayout
-Consumer-facing contract of semantics, formats, offsets, and per-buffer bindings/stride.
-
-## Packing: MeshPacker and PackSpec
-
-### PackSpec
-Defines policy:
-- interleaved vs multi-stream layout
-- per-attribute compression
-- index width policy (`u16`/`u32`/auto)
-- alignment and stride rules
-
-Literature-aligned realtime defaults and priority order are documented in `docs/performance-profile.md`.
-
-### MeshPacker
-`MeshPacker.pack(mesh, spec)` returns `PackedMesh`.
-
-Packing may reorder geometry, compress formats, and choose index width by policy.
-
-## Lifetime & Memory Model
-
-v1 baseline:
-- `MeshData`: GC-managed arrays/collections
-- `PackedMesh`: direct `ByteBuffer` by default
-
-Future memory backend extensions (segment/arena-backed ownership) can be added when needed and should define lifetime via `AutoCloseable`.
-
-## Renderer Integration
-
-MeshForge stays rendering-API agnostic.
-
-Integration boundary:
+Consumers should integrate against:
+- `PackedMesh`
 - `VertexLayout`
 - `VertexBufferView` / `IndexBufferView`
-- `Submesh[]`
-- `Boundsf`
+- `Submesh`
+- bounds
 
-Future API bridges should be optional (`org.meshforge.bridge.*`) and separate from core.
-
-## Public API Surface (v1)
-
-Common user-facing types:
-- `MeshData`, `Submesh`
-- `VertexSchema`, `AttributeSemantic`, `VertexFormat`, `VertexAttributeView`
-- `MeshBuilder`, `MeshWriter`
-- `MeshOp`, `MeshPipeline` (optional `Ops`)
-- `PackSpec`, `MeshPacker`, `PackedMesh`, `VertexLayout`
-
-Optional facades:
-- `org.meshforge.api.Meshes`
-- `org.meshforge.api.Ops`
-- `org.meshforge.api.Packers`
-
-## Typical Usage
-
-```java
-MeshData mesh = Meshes.builder(Topology.TRIANGLES)
-    .schema(VertexSchema.standardLit())
-    .add(...)
-    .build();
-
-mesh = MeshPipeline.run(mesh,
-    Ops.weld(1e-6f),
-    Ops.normals(60f),
-    Ops.tangents(),
-    Ops.optimizeVertexCache(),
-    Ops.bounds()
-);
-
-PackedMesh packed = MeshPacker.pack(mesh, Packers.realtime());
-```
+No renderer-specific API surface is required in MeshForge core.

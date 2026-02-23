@@ -7,9 +7,11 @@ import org.meshforge.core.attr.AttributeSemantic;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class FastObjMeshLoaderTest {
     @Test
@@ -39,5 +41,19 @@ class FastObjMeshLoaderTest {
         var pos = mesh.attribute(AttributeSemantic.POSITION, 0).rawFloatArrayOrNull();
         assertNotNull(pos);
         assertEquals(12, pos.length);
+    }
+
+    @Test
+    void failsWhenFaceIndexIsOutOfBounds(@TempDir Path tempDir) throws Exception {
+        String obj = """
+            v 0 0 0
+            v 1 0 0
+            v 0 1 0
+            f 1 2 4
+            """;
+        Path file = tempDir.resolve("invalid.obj");
+        Files.writeString(file, obj, StandardCharsets.US_ASCII);
+
+        assertThrows(IOException.class, () -> FastObjMeshLoader.load(file));
     }
 }

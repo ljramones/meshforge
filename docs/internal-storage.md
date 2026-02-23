@@ -1,132 +1,54 @@
-# MeshForge v1 Internal Storage
+# MeshForge Internal Storage
 
-This document defines the v1 internal representation for `MeshData` and its relationship to packing.
+Last updated: 2026-02-23
 
-## Canonical Decision
-Use **SoA-by-attribute** as the canonical authoring layout.
+## Canonical Representation
 
-- `MeshData` storage: one primitive array per attribute
-- `PackedMesh` storage: interleaved or multi-stream per `PackSpec`
+- `MeshData`: SoA-by-attribute (one primitive array per attribute)
+- `PackedMesh`: packed runtime buffers produced by `MeshPacker`
 
-Rationale:
-- maps well to mesh ops (normals, tangents, bounds, weld)
-- avoids per-vertex object churn
-- supports vectorization-friendly loops
-- keeps packing conversion explicit at the authoring/runtime boundary
+This boundary is intentional:
+- ops are easier and faster on semantic SoA data
+- packing concerns stay isolated and explicit
 
-## MeshData Internal Shape
+## `MeshData` internals
 
 `MeshData` owns:
-- `Topology topology`
-- `VertexSchema schema`
-- `int vertexCount`
-- `IndexBuffer indices` (optional)
-- `List<Submesh> submeshes`
-- cached `Boundsf` + dirty flags
-- `AttributeStore attributes`
+- topology
+- schema
+- vertex count
+- optional `int[]` indices
+- submeshes
+- attribute store
+- optional morph target list
 
-### AttributeStore
-Attributes are keyed by `(AttributeSemantic, setIndex)`.
+Authoring canonical formats:
+- `POSITION` `F32x3`
+- `NORMAL` `F32x3`
+- `TANGENT` `F32x4`
+- `UV*` `F32x2`
+- `JOINTS` typically `I32x4`/`U16x4` at authoring boundaries
+- `WEIGHTS` `F32x4`
 
-Key recommendation:
-- compact integer key: `(semanticId << 8) | setIndex` (v1 assumes `setIndex < 256`)
-- map implementation: fast int-key map (for example fastutil) or equivalent internal map
+## `PackedMesh` internals
 
-## Attribute Storage Kinds
+Packed output currently:
+- interleaved vertex stream
+- optional index stream (`u16`/`u32` by policy)
+- layout/offset/stride metadata
 
-Use a small fixed set of backing types driven by `VertexFormat`:
-- `FloatStorage` (`float[]`)
-- `IntStorage` (`int[]`)
-- `ShortStorage` (`short[]`)
-- `ByteStorage` (`byte[]`)
+Implementation status:
+- multi-stream mode is declared in `PackSpec`
+- `MeshPacker` currently supports interleaved mode only
 
-Each storage defines:
-- primitive array
-- component count
-- format metadata
+## Mutation and cache flags
 
-Example (`F32x3`):
-- `float[] data`
-- `components = 3`
-- element addressing: `data[vertexIndex * 3 + component]`
+Mesh operations are expected to invalidate derived data when needed:
+- bounds
+- generated normals/tangents (when topology/order changes)
 
-## VertexFormat Responsibilities
+## Design constraints
 
-`VertexFormat` should describe:
-- scalar kind (`FLOAT`/`INT`/`SHORT`/`BYTE`)
-- component count (1..4)
-- normalized flag (for integer encodings)
-- packing semantics (snorm/unorm/half, etc.)
-- byte size per element
-
-v1 recommendation:
-- keep mesh ops canonical on float formats
-- defer compression/quantization to pack stage
-
-## Canonical Authoring Formats (v1)
-- `POSITION`: `F32x3`
-- `NORMAL`: `F32x3`
-- `TANGENT`: `F32x4` (`w` = handedness)
-- `UVn`: `F32x2`
-- `COLOR0`: `F32x4` (or `UNORM8x4` if required)
-- `JOINTS0`: `I32x4` (authoring)
-- `WEIGHTS0`: `F32x4` (authoring)
-
-## Index Storage
-
-Use `int[]` as authoring canonical index storage.
-
-```java
-final class IndexBuffer {
-  final int[] data;
-  final int count;
-}
-```
-
-Pack stage decides `u16` vs `u32` for runtime buffers.
-
-## VertexAttributeView Contract
-
-Public API should expose views, not raw storage internals.
-
-Expected methods:
-- typed get/set (`get2f`, `get3f`, `get4f`, `set...`)
-- optional advanced raw access (`rawFloatArray`, `rawIntArray`) clearly marked expert-use
-
-## Dirty Flags and Caches
-
-Track mutability/cached state in `MeshData`:
-- `boundsDirty`
-- optional `normalsDirty`
-- optional `tangentsDirty`
-- optional `indicesDirty`
-- `vertexOrderDirty` (weld/reindex/optimize)
-
-Ops are responsible for setting/clearing relevant flags.
-
-## Optional Internal Kernel Views
-
-For hot paths, expose internal lightweight wrappers (not separate storage), e.g.:
-- `Positions3f` view over `float[]`
-- `Normals3f` view over `float[]`
-
-These avoid repeated format checks in tight loops while preserving a single backing store.
-
-## Class Placement Guidance
-
-Internal/package-private:
-- `AttributeStore`
-- key helper(s) for semantic/set keys
-- `AttributeStorage` + typed implementations
-
-Public:
-- `MeshData`
-- `VertexSchema`
-- `VertexFormat`
-- `VertexAttributeView`
-
-## Boundary Summary
-
-- `MeshData`: SoA-by-attribute authoring model
-- `PackedMesh`: runtime-oriented packed model
-- conversion occurs explicitly in pack stage
+- no per-vertex object model in hot paths
+- fail-fast validation at loader and pack boundaries
+- deterministic output for identical inputs + options

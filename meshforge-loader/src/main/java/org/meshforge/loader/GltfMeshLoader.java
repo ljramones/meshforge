@@ -4,6 +4,7 @@ import org.meshforge.core.attr.AttributeSemantic;
 import org.meshforge.core.attr.VertexFormat;
 import org.meshforge.core.attr.VertexSchema;
 import org.meshforge.core.mesh.MeshData;
+import org.meshforge.core.mesh.MorphTarget;
 import org.meshforge.core.mesh.Submesh;
 import org.meshforge.core.topology.Topology;
 import org.meshforge.loader.gltf.read.MeshoptCompressionFilter;
@@ -78,7 +79,9 @@ public final class GltfMeshLoader implements MeshFileLoader {
         List<byte[]> buffers = decodeBuffers(root, path, embeddedBin);
         List<Map<String, Object>> bufferViews = listOfObjects(root.get("bufferViews"), "bufferViews");
         List<Map<String, Object>> accessors = listOfObjects(root.get("accessors"), "accessors");
-        Map<String, Object> primitive = firstPrimitive(root);
+        PrimitiveRef primitiveRef = firstPrimitive(root);
+        Map<String, Object> primitive = primitiveRef.primitive();
+        // v1 scope: only meshes[0].primitives[0] is imported. Morph targets are loaded from this primitive only.
 
         @SuppressWarnings("unchecked")
         Map<String, Object> attrs = asObject(primitive.get("attributes"), "meshes[0].primitives[0].attributes");
@@ -91,6 +94,8 @@ public final class GltfMeshLoader implements MeshFileLoader {
         semantics.put(AttributeSemantic.POSITION, positionAccessorIndex);
         putIfPresent(attrs, "NORMAL", AttributeSemantic.NORMAL, semantics);
         putIfPresent(attrs, "TEXCOORD_0", AttributeSemantic.UV, semantics);
+        putIfPresent(attrs, "JOINTS_0", AttributeSemantic.JOINTS, semantics);
+        putIfPresent(attrs, "WEIGHTS_0", AttributeSemantic.WEIGHTS, semantics);
 
         VertexSchema.Builder schemaBuilder = VertexSchema.builder()
             .add(AttributeSemantic.POSITION, 0, VertexFormat.F32x3);
@@ -99,6 +104,12 @@ public final class GltfMeshLoader implements MeshFileLoader {
         }
         if (semantics.containsKey(AttributeSemantic.UV)) {
             schemaBuilder.add(AttributeSemantic.UV, 0, VertexFormat.F32x2);
+        }
+        if (semantics.containsKey(AttributeSemantic.JOINTS)) {
+            schemaBuilder.add(AttributeSemantic.JOINTS, 0, VertexFormat.I32x4);
+        }
+        if (semantics.containsKey(AttributeSemantic.WEIGHTS)) {
+            schemaBuilder.add(AttributeSemantic.WEIGHTS, 0, VertexFormat.F32x4);
         }
         VertexSchema schema = schemaBuilder.build();
 
@@ -122,6 +133,30 @@ public final class GltfMeshLoader implements MeshFileLoader {
             }
             copyFloatAttribute(mesh, AttributeSemantic.UV, 0, uv, 2);
         }
+        Integer skinJointCount = null;
+        Integer resolvedSkinIndex = null;
+        if (semantics.containsKey(AttributeSemantic.JOINTS)) {
+            resolvedSkinIndex = resolveSkinIndex(root, primitiveRef);
+            if (resolvedSkinIndex == null) {
+                throw new IOException("JOINTS_0 present but no skin reference could be resolved for primitive");
+            }
+            skinJointCount = skinJointCount(root, resolvedSkinIndex);
+        }
+        if (semantics.containsKey(AttributeSemantic.JOINTS)) {
+            AccessorData joints = readAccessor(accessors, bufferViews, buffers, semantics.get(AttributeSemantic.JOINTS), options);
+            if (joints.count != vertexCount) {
+                throw new IOException("JOINTS_0 accessor count mismatch: " + joints.count + " != " + vertexCount);
+            }
+            copyJointAttribute(mesh, joints, skinJointCount);
+        }
+        if (semantics.containsKey(AttributeSemantic.WEIGHTS)) {
+            AccessorData weights = readAccessor(accessors, bufferViews, buffers, semantics.get(AttributeSemantic.WEIGHTS), options);
+            if (weights.count != vertexCount) {
+                throw new IOException("WEIGHTS_0 accessor count mismatch: " + weights.count + " != " + vertexCount);
+            }
+            copyWeightsAttribute(mesh, weights);
+        }
+        mesh.setMorphTargets(readMorphTargets(root, primitiveRef, primitive, accessors, bufferViews, buffers, options, vertexCount));
 
         Integer indicesAccessor = numberAsInt(primitive.get("indices"), "indices accessor");
         if (indicesAccessor != null) {
@@ -134,6 +169,120 @@ public final class GltfMeshLoader implements MeshFileLoader {
             mesh.setSubmeshes(List.of(new Submesh(0, indices.length, "default")));
         }
         return mesh;
+    }
+
+    private static List<MorphTarget> readMorphTargets(
+        Map<String, Object> root,
+        PrimitiveRef primitiveRef,
+        Map<String, Object> primitive,
+        List<Map<String, Object>> accessors,
+        List<Map<String, Object>> bufferViews,
+        List<byte[]> buffers,
+        MeshLoadOptions options,
+        int vertexCount
+    ) throws IOException {
+        Object rawTargets = primitive.get("targets");
+        if (rawTargets == null) {
+            return List.of();
+        }
+        List<Map<String, Object>> targets = listOfObjects(rawTargets, "meshes[0].primitives[0].targets");
+        if (targets.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> targetNames = morphTargetNames(root, primitiveRef.meshIndex());
+        List<MorphTarget> out = new ArrayList<>(targets.size());
+        for (int i = 0; i < targets.size(); i++) {
+            Map<String, Object> target = targets.get(i);
+            Integer posAccessor = numberAsInt(target.get("POSITION"), "targets[" + i + "].POSITION");
+            if (posAccessor == null) {
+                throw new IOException("Morph target " + i + " is missing POSITION deltas");
+            }
+            float[] pos = readMorphDelta(accessors, bufferViews, buffers, posAccessor, options, vertexCount, "POSITION", i);
+
+            Integer normalAccessor = numberAsInt(target.get("NORMAL"), "targets[" + i + "].NORMAL");
+            float[] nrm = normalAccessor == null
+                ? null
+                : readMorphDelta(accessors, bufferViews, buffers, normalAccessor, options, vertexCount, "NORMAL", i);
+
+            Integer tangentAccessor = numberAsInt(target.get("TANGENT"), "targets[" + i + "].TANGENT");
+            float[] tan = tangentAccessor == null
+                ? null
+                : readMorphDelta(accessors, bufferViews, buffers, tangentAccessor, options, vertexCount, "TANGENT", i);
+
+            String name = i < targetNames.size() ? targetNames.get(i) : "target_" + i;
+            out.add(new MorphTarget(name, pos, nrm, tan));
+        }
+        return out;
+    }
+
+    private static float[] readMorphDelta(
+        List<Map<String, Object>> accessors,
+        List<Map<String, Object>> bufferViews,
+        List<byte[]> buffers,
+        int accessorIndex,
+        MeshLoadOptions options,
+        int vertexCount,
+        String semantic,
+        int targetIndex
+    ) throws IOException {
+        AccessorData accessor = readAccessor(accessors, bufferViews, buffers, accessorIndex, options);
+        if (accessor.count != vertexCount) {
+            throw new IOException(
+                "Morph target " + targetIndex + " " + semantic + " count mismatch: " + accessor.count + " != " + vertexCount);
+        }
+        if (accessor.components != 3 || accessor.componentType != COMPONENT_FLOAT) {
+            throw new IOException(
+                "Morph target " + targetIndex + " " + semantic + " must be VEC3/FLOAT");
+        }
+        final float[] out;
+        try {
+            out = new float[Math.multiplyExact(vertexCount, 3)];
+        } catch (ArithmeticException ex) {
+            throw new IOException(
+                "Morph target " + targetIndex + " " + semantic + " allocation overflow for vertexCount=" + vertexCount,
+                ex
+            );
+        }
+        for (int i = 0; i < vertexCount; i++) {
+            int o = i * 3;
+            out[o] = readFloatComponent(accessor, i, 0);
+            out[o + 1] = readFloatComponent(accessor, i, 1);
+            out[o + 2] = readFloatComponent(accessor, i, 2);
+        }
+        return out;
+    }
+
+    private static List<String> morphTargetNames(Map<String, Object> root, int meshIndex) throws IOException {
+        Object meshesValue = root.get("meshes");
+        if (meshesValue == null) {
+            return List.of();
+        }
+        List<Map<String, Object>> meshes = listOfObjects(meshesValue, "meshes");
+        if (meshIndex < 0 || meshIndex >= meshes.size()) {
+            return List.of();
+        }
+        Map<String, Object> mesh = meshes.get(meshIndex);
+        Object extrasValue = mesh.get("extras");
+        if (extrasValue == null) {
+            return List.of();
+        }
+        Map<String, Object> extras = asObject(extrasValue, "meshes[" + meshIndex + "].extras");
+        Object namesValue = extras.get("targetNames");
+        if (namesValue == null) {
+            return List.of();
+        }
+        if (!(namesValue instanceof List<?> rawNames)) {
+            throw new IOException("Expected JSON array for meshes[" + meshIndex + "].extras.targetNames");
+        }
+        List<String> names = new ArrayList<>(rawNames.size());
+        for (Object value : rawNames) {
+            if (!(value instanceof String s) || s.isBlank()) {
+                throw new IOException("Invalid morph target name in meshes[" + meshIndex + "].extras.targetNames");
+            }
+            names.add(s);
+        }
+        return names;
     }
 
     private static void putIfPresent(
@@ -169,7 +318,7 @@ public final class GltfMeshLoader implements MeshFileLoader {
 
     private static float readFloatComponent(AccessorData accessor, int index, int component) throws IOException {
         int off = accessor.byteOffset + index * accessor.byteStride + component * accessor.componentSize;
-        if (off + accessor.componentSize > accessor.data.length) {
+        if (off < 0 || off + accessor.componentSize > accessor.data.length) {
             throw new IOException("Accessor read out of bounds");
         }
         return switch (accessor.componentType) {
@@ -180,7 +329,7 @@ public final class GltfMeshLoader implements MeshFileLoader {
 
     private static int readUnsignedIntComponent(AccessorData accessor, int index, int component) throws IOException {
         int off = accessor.byteOffset + index * accessor.byteStride + component * accessor.componentSize;
-        if (off + accessor.componentSize > accessor.data.length) {
+        if (off < 0 || off + accessor.componentSize > accessor.data.length) {
             throw new IOException("Index accessor read out of bounds");
         }
         return switch (accessor.componentType) {
@@ -188,6 +337,78 @@ public final class GltfMeshLoader implements MeshFileLoader {
             case COMPONENT_UNSIGNED_SHORT -> accessor.buffer.getShort(off) & 0xFFFF;
             case COMPONENT_UNSIGNED_BYTE -> accessor.buffer.get(off) & 0xFF;
             default -> throw new IOException("Unsupported index componentType: " + accessor.componentType);
+        };
+    }
+
+    private static void copyJointAttribute(
+        MeshData mesh,
+        AccessorData accessor,
+        Integer skinJointCount
+    ) throws IOException {
+        if (accessor.components != 4) {
+            throw new IOException("JOINTS_0 accessor components mismatch: expected 4 got " + accessor.components);
+        }
+        var view = mesh.attribute(AttributeSemantic.JOINTS, 0);
+        for (int i = 0; i < accessor.count; i++) {
+            for (int c = 0; c < 4; c++) {
+                int joint = readUnsignedIntComponent(accessor, i, c);
+                if (skinJointCount != null && joint >= skinJointCount) {
+                    throw new IOException(
+                        "JOINTS_0 value out of range at vertex " + i + " component " + c
+                            + ": " + joint + " (skin jointCount=" + skinJointCount + ")"
+                    );
+                }
+                view.setInt(i, c, joint);
+            }
+        }
+    }
+
+    private static void copyWeightsAttribute(MeshData mesh, AccessorData accessor) throws IOException {
+        if (accessor.components != 4) {
+            throw new IOException("WEIGHTS_0 accessor components mismatch: expected 4 got " + accessor.components);
+        }
+        var view = mesh.attribute(AttributeSemantic.WEIGHTS, 0);
+        for (int i = 0; i < accessor.count; i++) {
+            float w0 = readWeightComponent(accessor, i, 0);
+            float w1 = readWeightComponent(accessor, i, 1);
+            float w2 = readWeightComponent(accessor, i, 2);
+            float w3 = readWeightComponent(accessor, i, 3);
+            float sum = w0 + w1 + w2 + w3;
+            if (sum > 1.0e-8f) {
+                float inv = 1.0f / sum;
+                w0 *= inv;
+                w1 *= inv;
+                w2 *= inv;
+                w3 *= inv;
+            } else {
+                w0 = 1.0f;
+                w1 = 0.0f;
+                w2 = 0.0f;
+                w3 = 0.0f;
+            }
+            view.setFloat(i, 0, w0);
+            view.setFloat(i, 1, w1);
+            view.setFloat(i, 2, w2);
+            view.setFloat(i, 3, w3);
+        }
+    }
+
+    private static float readWeightComponent(AccessorData accessor, int index, int component) throws IOException {
+        int off = accessor.byteOffset + index * accessor.byteStride + component * accessor.componentSize;
+        if (off < 0 || off + accessor.componentSize > accessor.data.length) {
+            throw new IOException("Accessor read out of bounds");
+        }
+        return switch (accessor.componentType) {
+            case COMPONENT_FLOAT -> accessor.buffer.getFloat(off);
+            case COMPONENT_UNSIGNED_BYTE -> {
+                int v = accessor.buffer.get(off) & 0xFF;
+                yield accessor.normalized ? v / 255.0f : (float) v;
+            }
+            case COMPONENT_UNSIGNED_SHORT -> {
+                int v = accessor.buffer.getShort(off) & 0xFFFF;
+                yield accessor.normalized ? v / 65535.0f : (float) v;
+            }
+            default -> throw new IOException("Unsupported WEIGHTS_0 componentType: " + accessor.componentType);
         };
     }
 
@@ -210,12 +431,23 @@ public final class GltfMeshLoader implements MeshFileLoader {
         if (count == null || componentType == null || viewIndex == null) {
             throw new IOException("Accessor is missing required fields");
         }
+        if (count < 0) {
+            throw new IOException("Accessor count must be >= 0");
+        }
+        if (accessorByteOffset < 0) {
+            throw new IOException("Accessor byteOffset must be >= 0");
+        }
 
         ViewData viewData = resolveViewData(bufferViews, buffers, viewIndex, options);
         int componentCount = componentCount(type);
         int compSize = componentSize(componentType);
         int packedStride = componentCount * compSize;
         int stride = viewData.byteStride > 0 ? viewData.byteStride : packedStride;
+        if (stride < packedStride) {
+            throw new IOException("Accessor stride is smaller than packed element size");
+        }
+        ensureAccessorRangeFits(viewData.data.length, accessorByteOffset, count, stride, packedStride);
+        boolean normalized = Boolean.TRUE.equals(accessor.get("normalized"));
         return new AccessorData(
             viewData.data,
             ByteBuffer.wrap(viewData.data).order(ByteOrder.LITTLE_ENDIAN),
@@ -224,8 +456,56 @@ public final class GltfMeshLoader implements MeshFileLoader {
             componentType,
             componentCount,
             compSize,
-            stride
+            stride,
+            normalized
         );
+    }
+
+    private static Integer resolveSkinIndex(Map<String, Object> root, PrimitiveRef primitiveRef) throws IOException {
+        Integer primitiveSkin = numberAsInt(primitiveRef.primitive().get("skin"), "primitive.skin");
+        if (primitiveSkin != null) {
+            return primitiveSkin;
+        }
+
+        Object nodesValue = root.get("nodes");
+        if (nodesValue == null) {
+            return null;
+        }
+        List<Map<String, Object>> nodes = listOfObjects(nodesValue, "nodes");
+        for (int i = 0; i < nodes.size(); i++) {
+            Map<String, Object> node = nodes.get(i);
+            Integer nodeMesh = numberAsInt(node.get("mesh"), "nodes[" + i + "].mesh");
+            if (nodeMesh == null || nodeMesh != primitiveRef.meshIndex()) {
+                continue;
+            }
+            Integer nodeSkin = numberAsInt(node.get("skin"), "nodes[" + i + "].skin");
+            if (nodeSkin != null) {
+                return nodeSkin;
+            }
+        }
+        return null;
+    }
+
+    private static Integer skinJointCount(Map<String, Object> root, int skinIndex) throws IOException {
+        Object skinsValue = root.get("skins");
+        if (skinsValue == null) {
+            return null;
+        }
+        List<Map<String, Object>> skins = listOfObjects(skinsValue, "skins");
+        if (skinIndex < 0 || skinIndex >= skins.size()) {
+            throw new IOException("skin index out of range: " + skinIndex);
+        }
+        if (skins.isEmpty()) {
+            return null;
+        }
+        Object jointsValue = skins.get(skinIndex).get("joints");
+        if (jointsValue == null) {
+            return null;
+        }
+        if (!(jointsValue instanceof List<?> list)) {
+            throw new IOException("Expected JSON array for skins[" + skinIndex + "].joints");
+        }
+        return list.size();
     }
 
     private static ViewData resolveViewData(
@@ -374,7 +654,7 @@ public final class GltfMeshLoader implements MeshFileLoader {
         return new String(jsonChunk, 0, end, StandardCharsets.UTF_8);
     }
 
-    private static Map<String, Object> firstPrimitive(Map<String, Object> root) throws IOException {
+    private static PrimitiveRef firstPrimitive(Map<String, Object> root) throws IOException {
         List<Map<String, Object>> meshes = listOfObjects(root.get("meshes"), "meshes");
         if (meshes.isEmpty()) {
             throw new IOException("glTF JSON missing meshes[0]");
@@ -383,7 +663,7 @@ public final class GltfMeshLoader implements MeshFileLoader {
         if (primitives.isEmpty()) {
             throw new IOException("glTF JSON missing meshes[0].primitives[0]");
         }
-        return primitives.get(0);
+        return new PrimitiveRef(0, 0, primitives.get(0));
     }
 
     private static byte[] bufferAt(List<byte[]> buffers, int index) throws IOException {
@@ -454,6 +734,26 @@ public final class GltfMeshLoader implements MeshFileLoader {
         };
     }
 
+    private static void ensureAccessorRangeFits(
+        int bufferLength,
+        int accessorByteOffset,
+        int count,
+        int stride,
+        int packedStride
+    ) throws IOException {
+        if (count == 0) {
+            if (accessorByteOffset > bufferLength) {
+                throw new IOException("Accessor byteOffset is out of bounds");
+            }
+            return;
+        }
+        long lastOffset = (long) accessorByteOffset + (long) (count - 1) * stride;
+        long requiredEnd = lastOffset + packedStride;
+        if (requiredEnd > bufferLength) {
+            throw new IOException("Accessor range is out of bounds");
+        }
+    }
+
     private record ViewData(byte[] data, int byteStride) {
     }
 
@@ -465,10 +765,14 @@ public final class GltfMeshLoader implements MeshFileLoader {
         int componentType,
         int components,
         int componentSize,
-        int byteStride
+        int byteStride,
+        boolean normalized
     ) {
     }
 
     private record GlbDocument(String json, byte[] binChunk) {
+    }
+
+    private record PrimitiveRef(int meshIndex, int primitiveIndex, Map<String, Object> primitive) {
     }
 }

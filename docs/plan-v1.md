@@ -1,4 +1,8 @@
-# MeshForge v1 Plan (with Vectrix)
+# MeshForge v1 Plan (Historical Snapshot)
+
+Last updated: 2026-02-23
+
+Note: this file is retained as a completion checklist snapshot. For current priorities, see `docs/roadmap.md`.
 
 ## Goal
 Authoring `MeshData` -> Ops -> immutable `PackedMesh` suitable for high-throughput downstream consumption.

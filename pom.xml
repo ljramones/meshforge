@@ -6,8 +6,18 @@
 
     <groupId>org.meshforge</groupId>
     <artifactId>meshforge-parent</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>1.1.0</version>
     <packaging>pom</packaging>
+    <name>MeshForge Parent</name>
+    <description>MeshForge parent build for mesh processing and packing modules.</description>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
 
     <modules>
         <module>meshforge</module>
@@ -38,4 +48,25 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <version>3.12.0</version>
+                    <configuration>
+                        <source>${maven.compiler.source}</source>
+                        <encoding>${project.build.sourceEncoding}</encoding>
+                        <additionalOptions>
+                            <additionalOption>--enable-preview</additionalOption>
+                            <additionalOption>--add-modules</additionalOption>
+                            <additionalOption>jdk.incubator.vector</additionalOption>
+                        </additionalOptions>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 </project>

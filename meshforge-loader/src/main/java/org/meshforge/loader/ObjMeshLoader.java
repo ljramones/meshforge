@@ -71,6 +71,7 @@ public final class ObjMeshLoader {
 
         int vertexCount = positions.size() / 3;
         int[] indexData = toIntArray(indices);
+        validateIndices(indexData, vertexCount);
         MeshData mesh = new MeshData(
             Topology.TRIANGLES,
             schema,
@@ -103,5 +104,14 @@ public final class ObjMeshLoader {
             out[i] = values.get(i);
         }
         return out;
+    }
+
+    private static void validateIndices(int[] indices, int vertexCount) throws IOException {
+        for (int i = 0; i < indices.length; i++) {
+            int index = indices[i];
+            if (index < 0 || index >= vertexCount) {
+                throw new IOException("OBJ face index out of bounds at " + i + ": " + index + " (vertexCount=" + vertexCount + ")");
+            }
+        }
     }
 }

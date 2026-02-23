@@ -1,11 +1,15 @@
 package org.meshforge.ops.pipeline;
 
 import org.meshforge.core.attr.AttributeSemantic;
+import org.meshforge.core.attr.VertexAttributeView;
 import org.meshforge.core.mesh.MeshData;
 import org.meshforge.core.mesh.Submesh;
 import org.meshforge.core.topology.Topology;
 
 public final class ValidateOp implements MeshOp {
+    private static final float TANGENT_DOT_NORMAL_EPSILON = 1.0e-3f;
+    private static final float HANDEDNESS_EPSILON = 1.0e-3f;
+
     @Override
     public MeshData apply(MeshData mesh, MeshContext context) {
         if (!mesh.has(AttributeSemantic.POSITION, 0)) {
@@ -42,6 +46,48 @@ public final class ValidateOp implements MeshOp {
             }
         }
 
+        validateTangents(mesh);
+
         return mesh;
+    }
+
+    private static void validateTangents(MeshData mesh) {
+        if (!mesh.has(AttributeSemantic.NORMAL, 0) || !mesh.has(AttributeSemantic.TANGENT, 0)) {
+            return;
+        }
+
+        VertexAttributeView normal = mesh.attribute(AttributeSemantic.NORMAL, 0);
+        VertexAttributeView tangent = mesh.attribute(AttributeSemantic.TANGENT, 0);
+
+        if (normal.format().components() < 3) {
+            throw new IllegalStateException("NORMAL[0] must have at least 3 components");
+        }
+        if (tangent.format().components() < 4) {
+            throw new IllegalStateException("TANGENT[0] must have at least 4 components (xyz + handedness)");
+        }
+
+        for (int i = 0; i < mesh.vertexCount(); i++) {
+            float nx = normal.getFloat(i, 0);
+            float ny = normal.getFloat(i, 1);
+            float nz = normal.getFloat(i, 2);
+
+            float tx = tangent.getFloat(i, 0);
+            float ty = tangent.getFloat(i, 1);
+            float tz = tangent.getFloat(i, 2);
+            float w = tangent.getFloat(i, 3);
+
+            if (!Float.isFinite(tx) || !Float.isFinite(ty) || !Float.isFinite(tz) || !Float.isFinite(w)) {
+                throw new IllegalStateException("TANGENT[0] contains non-finite values at vertex " + i);
+            }
+
+            float dot = nx * tx + ny * ty + nz * tz;
+            if (Math.abs(dot) > TANGENT_DOT_NORMAL_EPSILON) {
+                throw new IllegalStateException("TANGENT[0] is not orthogonal to NORMAL[0] at vertex " + i + " (dot=" + dot + ")");
+            }
+
+            if (Math.abs(Math.abs(w) - 1.0f) > HANDEDNESS_EPSILON) {
+                throw new IllegalStateException("TANGENT[0] handedness must be +/-1 at vertex " + i + " (w=" + w + ")");
+            }
+        }
     }
 }

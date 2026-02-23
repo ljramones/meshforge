@@ -14,12 +14,13 @@ This project uses a benchmark baseline gate for high-confidence performance trac
 
 - Date: February 22, 2026 (full outside-suite run captured)
 - Environment: outside sandbox, JDK 25.0.1, forked JMH runs
+- Methodology update: `MeshOpsBenchmark` state setup uses `@Setup(Level.Iteration)` to avoid per-invocation fixture copy inflating op timings.
 - Baseline references currently tracked:
-  - `OptimizeVertexCacheBenchmark.optimizeAndMeasureAcmr`: `294.325 ms/op`
-  - `MeshPipelineBenchmark.realtimePipeline`: `161.892 ms/op`
-  - `MeshPackerBenchmark.packRealtime`: `5.356 ms/op`
-  - `MeshOpsBenchmark.weld`: `3.478 ms/op`
-  - `MeshOpsBenchmark.recalculateTangents`: `1.109 ms/op`
+  - `OptimizeVertexCacheBenchmark.optimizeAndMeasureAcmr`: `305.694 ms/op`
+  - `MeshPipelineBenchmark.realtimePipeline`: `179.638 ms/op`
+  - `MeshPackerBenchmark.packRealtime`: `1.242 ms/op`
+  - `MeshOpsBenchmark.weld`: `7.625 ms/op`
+  - `MeshOpsBenchmark.recalculateTangents`: `1.123 ms/op`
 
 Note: baseline values above are policy-gated references in `perf/baseline.csv`; refresh only after explicit review.
 

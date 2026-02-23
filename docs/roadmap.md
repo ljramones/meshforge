@@ -1,45 +1,32 @@
 # MeshForge Roadmap
 
-This roadmap tracks planned features after the current v1 foundation.
+Last updated: 2026-02-23
 
-## Active Now (Part 2: SoA + SIMD)
-- [ ] Loader parse hot-path hardening (OBJ numeric/token parsing throughput).
-- [x] Add parse-focused fixture timing loops for fast A/B validation.
-- [ ] Add SIMD-ready kernel boundary around normal/attribute packing and conversion.
-- [x] Track normalized parse throughput (`us / 1M verts`) on baseline fixtures.
-- [ ] Keep parity tests green between legacy and fast OBJ loaders on all baseline fixtures.
+## Completed (v1 foundation)
 
-## Near Term (v1 completion)
-- Harden current ops with more fixture-based tests and benchmarks.
-- Add JMH benchmarks for `OptimizeVertexCacheOp`, weld/compact, and packing throughput.
-- Improve weld policy with configurable seam-safe keys (POSITION-only vs POSITION+UV+NORMAL).
-- Add richer packer validation (format coverage, bounds/metadata consistency).
-- Add lightweight OBJ/glTF import stubs to feed `MeshData` directly.
-- Expand `meshforge-loader` format registry by porting parser logic from `DynamisFX-Importers`
-  where feasible without JavaFX runtime coupling.
+- Core authoring model (`MeshData`, schema, builder/writer)
+- Loader hardening for OBJ/STL/PLY/OFF and glTF/glb geometry path
+- Skinning + morph target ingestion for glTF
+- Boundary-safe weld with regression coverage
+- Submesh-safe index mutation across affected ops
+- Realtime pack fast path and validated perf gate
+- Stress/fuzz suites and large-count guardrails
 
-## v1.1 (engine-grade quality)
-- Upgrade `RecalculateTangentsOp` to MikkTSpace-compatible output.
-- Add candidate-queue tuning and optional overdraw optimization pass.
-- Add `PackSpec.mobile()` profile tuned for tighter bandwidth budgets.
-- Add optional octa normal packing path and shader decode reference notes.
-- Add stronger policy controls for auto-generated vs fail-fast pack requirements.
+## Near-term follow-ups
 
-## v1.2 (workflow and interoperability)
-- Add `loader.gltf.read` basic reader in `meshforge-loader` (positions/indices, then normals/uvs/material groups).
-- Add `loader.gltf.write` basic exporter support in `meshforge-loader`.
-- Add bridge examples for renderer upload descriptors from `VertexLayout`.
-- Add migration helpers for external mesh sources (OBJ, tool exports).
+- Multi-stream pack mode implementation (`PackSpec.LayoutMode.MULTI_STREAM`)
+- Additional benchmark coverage for loader/parser variants
+- Optional weld key policy extensions (for seam-preserving workflows)
 
-## Later (advanced features)
-- Multi-stream packing and stream partition policies.
-- Meshlet/cluster generation path for modern GPU pipelines.
-- Optional LOD generation pipeline integration.
-- Skinning/morph-target authoring and packing extensions.
-- Optional off-heap/arena-backed packed storage mode with explicit lifetime controls.
+## v1.x quality upgrades
 
-## Guiding Principles
-- Keep `MeshData` flexible and processing-friendly.
-- Keep `PackedMesh` immutable and renderer-ready.
-- Prefer policy-driven behavior over hardcoded formats.
-- Add complexity only when benchmark results justify it.
+- Tangent basis compatibility mode improvements
+- Optional overdraw optimization pass tuning
+- Additional pack profiles (`mobile`, content-class specific presets)
+
+## Later
+
+- Meshlet/cluster runtime export enhancements
+- LOD/decimation integration
+- Loader expansion for currently unsupported planned formats
+- Optional off-heap/arena-backed packed storage ownership modes

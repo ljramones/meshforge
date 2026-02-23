@@ -1,53 +1,59 @@
-# MeshForge API (Basic)
+# MeshForge API
 
-This document describes the planned v1 API surface at a high level. It is intentionally basic and may evolve as implementation lands.
+Last updated: 2026-02-23
 
-## API Layers
+This is the current API shape for MeshForge v1.
+Canonical top-level API reference: `API.md`.
 
-MeshForge is organized around three user-facing stages:
+## Layers
 
-1. Authoring: create/edit `MeshData`
-2. Processing: apply `MeshOp` pipelines
-3. Packing: convert to immutable `PackedMesh`
+1. Authoring: editable `MeshData`
+2. Processing: `MeshPipeline` + `MeshOp`
+3. Packing: immutable `PackedMesh`
 
-## Primary Types
+## Core Types
 
 ### Authoring (`org.meshforge.core.*`)
-- `MeshData`: editable semantic mesh model
-- `Topology`: primitive mode (TRIANGLES/LINES/POINTS)
-- `Submesh`: index range and material association
-- `VertexSchema`: declared attribute contract
-- `VertexAttributeView`: typed/bulk attribute access
-- `MeshBuilder`: ergonomic mesh construction
-- `MeshWriter`: bulk/high-throughput construction
+- `MeshData`
+- `Topology`
+- `Submesh`
+- `VertexSchema`
+- `VertexAttributeView`
+- `MeshBuilder`
+- `MeshWriter`
+- `MorphTarget`
 
 ### Processing (`org.meshforge.ops.*`)
-- `MeshOp`: single operation contract
-- `MeshPipeline`: sequential op execution
-- `MeshContext`: shared scratch/config for ops
+- `MeshOp`
+- `MeshPipeline`
+- `MeshContext`
 
-Planned op categories:
+Common operation families:
 - validate/repair
-- generate (normals/tangents/bounds)
-- modify (weld; triangulate planned)
-- optimize (cache reorder/compaction)
+- generate (normals, tangents, bounds)
+- modify (weld, compact, triangulate)
+- optimize (cache reorder, meshlet cluster/order)
 
 ### Packing (`org.meshforge.pack.*`)
-- `PackSpec`: packing and compression policy
-- `MeshPacker`: `MeshData` -> `PackedMesh`
-- `PackedMesh`: immutable runtime mesh payload
-- `VertexLayout`: consumer-facing format/offset/stride description
-- `VertexBufferView` / `IndexBufferView`: packed buffer views
+- `PackSpec`
+- `MeshPacker`
+- `PackedMesh`
+- `VertexLayout`
+- `VertexBufferView`
+- `IndexBufferView`
+
+Implementation note:
+- `PackSpec.LayoutMode.MULTI_STREAM` is declared.
+- `MeshPacker` currently supports `INTERLEAVED` output only and fails fast for other layout modes.
 
 ## Convenience Facade (`org.meshforge.api`)
 
-Front-door classes keep common workflows simple:
-- `Meshes`: creation helpers
-- `Ops`: operation factories/pipeline helpers
-- `Pipelines`: preset processing flows (`realtime`, `realtimeFast`)
-- `Packers`: packing presets/helpers
+- `Meshes`
+- `Ops`
+- `Pipelines`
+- `Packers`
 
-## Intended Usage Flow
+## Typical Flow
 
 ```java
 MeshData mesh = Meshes.builder(Topology.TRIANGLES)
@@ -55,6 +61,8 @@ MeshData mesh = Meshes.builder(Topology.TRIANGLES)
     .build();
 
 mesh = MeshPipeline.run(mesh,
+    Ops.validate(),
+    Ops.removeDegenerates(),
     Ops.weld(1e-6f),
     Ops.normals(60f),
     Ops.tangents(),
@@ -65,16 +73,13 @@ mesh = MeshPipeline.run(mesh,
 PackedMesh packed = MeshPacker.pack(mesh, Packers.realtime());
 ```
 
-Preset form:
+## Loader Notes
 
-```java
-mesh = Pipelines.realtimeFast(mesh);
-PackedMesh packed = MeshPacker.pack(mesh, Packers.realtimeFast());
-```
+- `MeshLoaders.defaults()` uses the fast OBJ parser plus STL/PLY/OFF.
+- glTF/glb loading is available through `MeshLoaders.planned()` and direct `GltfMeshLoader`.
+- glTF skinning (`JOINTS_0`/`WEIGHTS_0`) and morph targets are supported.
 
-## Notes
-- Core MeshForge stays renderer-API agnostic.
-- `MeshData` favors flexibility; `PackedMesh` favors compact immutable runtime handoff.
-- For design rationale and boundaries, see `docs/meshforge-architecture.md`.
-- For internal authoring storage details (SoA layout, storage kinds, dirty flags), see `docs/internal-storage.md`.
-- For realtime defaults and optimization priorities, see `docs/performance-profile.md`.
+## Stability Notes
+
+- MeshForge core is renderer-API agnostic.
+- `meshforge-demo` is an integration sandbox, not a compatibility contract.

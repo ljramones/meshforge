@@ -47,8 +47,19 @@ public final class OffMeshLoader {
 
         int vertexCount = Integer.parseInt(counts[0]);
         int faceCount = Integer.parseInt(counts[1]);
+        if (vertexCount < 0 || faceCount < 0) {
+            throw new IOException("OFF counts must be >= 0");
+        }
+        if (vertexCount == Integer.MAX_VALUE) {
+            throw new IOException("OFF vertexCount exceeds supported limit: " + vertexCount);
+        }
 
-        float[] positions = new float[vertexCount * 3];
+        final float[] positions;
+        try {
+            positions = new float[Math.multiplyExact(vertexCount, 3)];
+        } catch (ArithmeticException ex) {
+            throw new IOException("OFF vertex buffer size overflow for vertexCount=" + vertexCount, ex);
+        }
         for (int i = 0; i < vertexCount; i++) {
             String line = nextDataLine(br);
             if (line == null) {
@@ -89,7 +100,9 @@ public final class OffMeshLoader {
             }
         }
 
-        return createMesh(positions, toIntArray(indexList));
+        int[] indices = toIntArray(indexList);
+        validateIndices(indices, vertexCount);
+        return createMesh(positions, indices);
     }
 
     private static String nextDataLine(BufferedReader br) throws IOException {
@@ -131,5 +144,14 @@ public final class OffMeshLoader {
             out[i] = values.get(i);
         }
         return out;
+    }
+
+    private static void validateIndices(int[] indices, int vertexCount) throws IOException {
+        for (int i = 0; i < indices.length; i++) {
+            int index = indices[i];
+            if (index < 0 || index >= vertexCount) {
+                throw new IOException("OFF face index out of bounds at " + i + ": " + index + " (vertexCount=" + vertexCount + ")");
+            }
+        }
     }
 }

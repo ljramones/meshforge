@@ -35,7 +35,7 @@ public class MeshOpsBenchmark {
             template = BenchmarkFixtures.createPositionGrid(256, 256);
         }
 
-        @Setup(Level.Invocation)
+        @Setup(Level.Iteration)
         public void invocationSetup() {
             working = BenchmarkFixtures.copyOf(template);
         }
@@ -51,7 +51,7 @@ public class MeshOpsBenchmark {
             template = BenchmarkFixtures.createPositionGridWithDegenerates(256, 256, 8);
         }
 
-        @Setup(Level.Invocation)
+        @Setup(Level.Iteration)
         public void invocationSetup() {
             working = BenchmarkFixtures.copyOf(template);
         }
@@ -67,7 +67,7 @@ public class MeshOpsBenchmark {
             template = BenchmarkFixtures.createRichGrid(256, 256);
         }
 
-        @Setup(Level.Invocation)
+        @Setup(Level.Iteration)
         public void invocationSetup() {
             working = BenchmarkFixtures.copyOf(template);
         }
@@ -86,7 +86,7 @@ public class MeshOpsBenchmark {
             template.setIndices(shuffled);
         }
 
-        @Setup(Level.Invocation)
+        @Setup(Level.Iteration)
         public void invocationSetup() {
             working = BenchmarkFixtures.copyOf(template);
         }
@@ -134,4 +134,3 @@ public class MeshOpsBenchmark {
         bh.consume(out.boundsOrNull());
     }
 }
-

@@ -9,11 +9,26 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * Immutable packing contract used by {@code MeshPacker}.
+ * <p>
+ * A {@code PackSpec} controls layout mode, index policy, target attribute
+ * formats, optional meshlet generation, and validation behavior.
+ */
 public final class PackSpec {
+    /**
+     * Vertex buffer layout strategy.
+     */
     public enum LayoutMode { INTERLEAVED, MULTI_STREAM }
 
+    /**
+     * Packed index width policy.
+     */
     public enum IndexPolicy { AUTO_16_IF_POSSIBLE, FORCE_32 }
 
+    /**
+     * Runtime normal encoding mode.
+     */
     public enum NormalPacking { SNORM8x4, OCTA_SNORM16x2 }
 
     private final LayoutMode layoutMode;

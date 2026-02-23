@@ -5,6 +5,12 @@ import org.meshforge.pack.layout.VertexLayout;
 import java.nio.ByteBuffer;
 import java.util.List;
 
+/**
+ * Immutable runtime-oriented mesh buffer payload produced by the packer.
+ * <p>
+ * The object contains packed vertex/index data, submesh index ranges, and
+ * optional meshlet streams/descriptor metadata.
+ */
 public final class PackedMesh {
     private final VertexLayout layout;
     private final ByteBuffer vertexBuffer;
@@ -14,6 +20,9 @@ public final class PackedMesh {
     private final ByteBuffer meshletDescriptorBuffer;
     private final int meshletDescriptorStrideBytes;
 
+    /**
+     * Creates a packed mesh without meshlet streams.
+     */
     public PackedMesh(
         VertexLayout layout,
         ByteBuffer vertexBuffer,
@@ -23,6 +32,9 @@ public final class PackedMesh {
         this(layout, vertexBuffer, indexBuffer, submeshes, null);
     }
 
+    /**
+     * Creates a packed mesh with optional meshlet stream.
+     */
     public PackedMesh(
         VertexLayout layout,
         ByteBuffer vertexBuffer,
@@ -33,6 +45,9 @@ public final class PackedMesh {
         this(layout, vertexBuffer, indexBuffer, submeshes, meshlets, null, 0);
     }
 
+    /**
+     * Creates a packed mesh with full optional meshlet descriptor payload.
+     */
     public PackedMesh(
         VertexLayout layout,
         ByteBuffer vertexBuffer,
@@ -83,11 +98,20 @@ public final class PackedMesh {
         return meshletDescriptorStrideBytes;
     }
 
+    /**
+     * Immutable index range + material binding for one submesh.
+     */
     public record SubmeshRange(int firstIndex, int indexCount, Object materialId) {
     }
 
+    /**
+     * Packed index primitive width.
+     */
     public enum IndexType { UINT16, UINT32 }
 
+    /**
+     * Immutable view of index buffer bytes and metadata.
+     */
     public record IndexBufferView(IndexType type, ByteBuffer buffer, int indexCount) {
     }
 }

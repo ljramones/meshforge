@@ -89,8 +89,14 @@ public final class StlMeshLoader {
             throw new IOException("Invalid STL triangle count: " + triangleCount);
         }
 
-        float[] positions = new float[Math.multiplyExact(triangleCount, 9)];
-        int[] indices = new int[Math.multiplyExact(triangleCount, 3)];
+        final float[] positions;
+        final int[] indices;
+        try {
+            positions = new float[Math.multiplyExact(triangleCount, 9)];
+            indices = new int[Math.multiplyExact(triangleCount, 3)];
+        } catch (ArithmeticException ex) {
+            throw new IOException("STL triangle count is too large: " + triangleCount, ex);
+        }
 
         byte[] triRecord = new byte[BINARY_TRIANGLE_RECORD_BYTES];
         ByteBuffer bb = ByteBuffer.wrap(triRecord).order(ByteOrder.LITTLE_ENDIAN);

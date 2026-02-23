@@ -2,13 +2,15 @@
 
 Use this guide to source local test assets for `meshforge-loader` and `meshforge-demo`.
 
+Last updated: 2026-02-23
+
 ## Recommended sources
 
 - OFF: ModelNet (Princeton) - https://modelnet.cs.princeton.edu/download.html
 - PLY: Stanford 3D Scanning Repository - https://graphics.stanford.edu/data/3Dscanrep/
 - STL: Thingi10K - https://github.com/Thingi10K/Thingi10K
 - OBJ: ShapeNet (approval required) - https://shapenet.org/
-- GLTF/GLB (future loader): Khronos Sample Assets - https://github.khronos.org/glTF-Assets/
+- GLTF/GLB: Khronos Sample Assets - https://github.khronos.org/glTF-Assets/
 
 ## Local fixture layout
 
@@ -22,7 +24,7 @@ Store assets in this repository under `fixtures/`:
 
 Current repo state:
 - Populated now: `fixtures/obj/medium`, `fixtures/stl/medium`, `fixtures/gltf/medium`
-- Present but currently empty: `fixtures/off`, `fixtures/ply`
+- OFF/PLY fixture folders exist and can be expanded for parser/regression coverage
 
 Naming convention:
 - Valid: `cube-valid.obj`, `bunny-medium.ply`

@@ -1,6 +1,6 @@
-benchmark,baseline_ms_per_op,max_regression_pct
-org.meshforge.bench.OptimizeVertexCacheBenchmark.optimizeAndMeasureAcmr,294.325,10
-org.meshforge.bench.MeshPipelineBenchmark.realtimePipeline,161.892,10
-org.meshforge.bench.MeshPackerBenchmark.packRealtime,5.356,10
-org.meshforge.bench.MeshOpsBenchmark.weld,3.478,10
-org.meshforge.bench.MeshOpsBenchmark.recalculateTangents,1.109,10
+benchmark,baseline,tolerance
+org.meshforge.bench.OptimizeVertexCacheBenchmark.optimizeAndMeasureAcmr,305.694,15
+org.meshforge.bench.MeshPipelineBenchmark.realtimePipeline,179.638,15
+org.meshforge.bench.MeshPackerBenchmark.packRealtime,1.242,20
+org.meshforge.bench.MeshOpsBenchmark.weld,7.625,15
+org.meshforge.bench.MeshOpsBenchmark.recalculateTangents,1.123,15

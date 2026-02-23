@@ -1,69 +1,51 @@
-# Mesh Loader Roadmap
+# Mesh Loader Status and Roadmap
 
-This roadmap defines the plan for reading multiple file types into `MeshData` through `meshforge-loader`.
+Last updated: 2026-02-23
 
-## Loader API Shape
+## Current Loader Registry
 
-Use format-specific factory methods in `MeshLoaderFactory` and registry dispatch via `MeshLoaders`.
+`MeshLoaders.defaults()` (production default):
+- `obj` -> fast OBJ loader
+- `stl`
+- `ply`
+- `off`
 
-- Factory methods (one per format):
-  - `obj()`, `stl()`, `ply()`, `gltf()`, `glb()`, `dae()`, `x3d()`, `off()`, `threemf()`, `wrl()`, `usd()`, `dxf()`, `tds()`, `mayaAscii()`, `cadStep()`, `cadIges()`, `fxml()`
-- `MeshLoaders.defaults()`:
-  - stable production-safe set (currently OBJ, STL, PLY, OFF)
-- `MeshLoaders.planned()`:
-  - all known extensions registered, unimplemented formats fail with explicit errors
+`MeshLoaders.defaultsLegacy()`:
+- `obj` -> legacy line-based OBJ loader
+- `stl`
+- `ply`
+- `off`
 
-## Integration Source
+`MeshLoaders.planned()`:
+- includes `gltf`/`glb` and a larger extension registry
+- unsupported formats fail with explicit "not implemented yet" errors
 
-Source parser logic can be adapted from:
-`/Users/larrymitchell/tripsnew/DynamisFX/DynamisFX-Importers`
+## Implemented Formats
 
-Important constraint:
-- DynamisFX importers target JavaFX/DynamisFX `Model3D` and cannot be used directly as-is.
-- MeshForge loaders must output `MeshData` and stay renderer/UI agnostic.
-
-## Implementation Phases
-
-1. Foundation
-- Keep OBJ loader stable
-- Keep registry/factory API stable
-- Add fixture-based tests per format port
-
-Implemented now:
-- OBJ (minimal positions + indexed triangles)
-- STL (ASCII + binary, triangle facets)
-- PLY (ASCII, polygon triangulation)
+- OBJ (legacy + fast parser)
+- STL (ASCII + binary)
+- PLY (ASCII polygon triangulation)
 - OFF (polygon triangulation)
+- glTF / glb (loader implemented; available via planned registry or direct loader use)
 
-2. Low-risk text formats
-- OFF
-- PLY
-- STL (done: ASCII + binary)
-- WRL (subset)
+## glTF Notes
 
-3. Structured scene formats
-- glTF/GLB (geometry path first)
-- DAE
-- X3D
+- Geometry attributes supported
+- Skinning attributes (`JOINTS_0` / `WEIGHTS_0`) supported
+- Morph target ingestion supported
+- Validation guardrails for accessor bounds/count/stride are in place
 
-4. Advanced/industrial formats
+## Unsupported Planned Formats (explicit placeholders)
+
+- DAE, X3D, 3MF, WRL
 - USD/USDA/USDC/USDZ
-- DXF
-- 3DS
+- DXF, 3DS
 - Maya ASCII (`.ma`)
-- CAD (STEP/IGES)
+- STEP/STP, IGES/IGS
+- FXML
 
-## Per-format Acceptance Criteria
+## Near-term Loader Work
 
-For each format:
-- Loads positions and triangle indices into `MeshData`
-- Produces deterministic index ordering
-- Sets one submesh range at minimum
-- Passes `Ops.validate()`
-- Works through `MeshLoaders.planned().load(path)` with extension dispatch
-
-## Policy
-
-- Parse generously, fail with actionable messages.
-- Keep authoring representation canonical (`POSITION F32x3`, indexed triangles).
-- Add normals/uv/tangents only when source data is present and valid.
+- Expand glTF conformance coverage and fixtures
+- Add format-specific parity tests between default and legacy OBJ where relevant
+- Continue fail-fast validation for malformed/truncated files

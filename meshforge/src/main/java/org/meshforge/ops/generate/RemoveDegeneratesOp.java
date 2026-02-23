@@ -3,10 +3,13 @@ package org.meshforge.ops.generate;
 import org.meshforge.core.attr.AttributeSemantic;
 import org.meshforge.core.attr.VertexAttributeView;
 import org.meshforge.core.mesh.MeshData;
+import org.meshforge.core.mesh.Submesh;
 import org.meshforge.ops.pipeline.MeshContext;
 import org.meshforge.ops.pipeline.MeshOp;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * Removes degenerate indexed triangles where vertices repeat.
@@ -29,24 +32,65 @@ public final class RemoveDegeneratesOp implements MeshOp {
         int triCount = indices.length / 3;
         int[] out = new int[indices.length];
         int write = 0;
+        List<Submesh> originalSubmeshes = mesh.submeshes();
+        boolean preserveSubmeshes = !originalSubmeshes.isEmpty();
+        List<Submesh> remappedSubmeshes = preserveSubmeshes ? new ArrayList<>(originalSubmeshes.size()) : List.of();
 
-        for (int t = 0; t < triCount; t++) {
-            int a = indices[t * 3];
-            int b = indices[t * 3 + 1];
-            int c = indices[t * 3 + 2];
-            if (a == b || b == c || a == c) {
-                continue;
+        if (preserveSubmeshes) {
+            for (Submesh submesh : originalSubmeshes) {
+                int first = submesh.firstIndex();
+                int count = submesh.indexCount();
+                if ((count % 3) != 0) {
+                    throw new IllegalStateException("Submesh indexCount must be divisible by 3");
+                }
+                if (first < 0 || first + count > indices.length) {
+                    throw new IllegalStateException("Submesh range exceeds index buffer");
+                }
+
+                int submeshWriteStart = write;
+                int end = first + count;
+                for (int i = first; i < end; i += 3) {
+                    int a = indices[i];
+                    int b = indices[i + 1];
+                    int c = indices[i + 2];
+                    if (a == b || b == c || a == c) {
+                        continue;
+                    }
+                    if (pos != null && posComps >= 3 && isZeroArea(a, b, c, pos, posComps)) {
+                        continue;
+                    }
+                    out[write++] = a;
+                    out[write++] = b;
+                    out[write++] = c;
+                }
+
+                int newCount = write - submeshWriteStart;
+                if (newCount > 0) {
+                    remappedSubmeshes.add(new Submesh(submeshWriteStart, newCount, submesh.materialId()));
+                }
             }
-            if (pos != null && posComps >= 3 && isZeroArea(a, b, c, pos, posComps)) {
-                continue;
+        } else {
+            for (int t = 0; t < triCount; t++) {
+                int a = indices[t * 3];
+                int b = indices[t * 3 + 1];
+                int c = indices[t * 3 + 2];
+                if (a == b || b == c || a == c) {
+                    continue;
+                }
+                if (pos != null && posComps >= 3 && isZeroArea(a, b, c, pos, posComps)) {
+                    continue;
+                }
+                out[write++] = a;
+                out[write++] = b;
+                out[write++] = c;
             }
-            out[write++] = a;
-            out[write++] = b;
-            out[write++] = c;
         }
 
         if (write != indices.length) {
             mesh.setIndices(Arrays.copyOf(out, write));
+            if (preserveSubmeshes) {
+                mesh.setSubmeshes(remappedSubmeshes);
+            }
         }
         return mesh;
     }

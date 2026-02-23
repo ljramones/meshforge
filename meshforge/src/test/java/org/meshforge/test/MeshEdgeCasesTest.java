@@ -167,6 +167,21 @@ class MeshEdgeCasesTest {
     }
 
     @Test
+    void addAttributeUpdatesSchema() {
+        MeshData mesh = new MeshData(positionSchema(), 1);
+        assertFalse(mesh.schema().has(AttributeSemantic.NORMAL, 0));
+        mesh.addAttribute(AttributeSemantic.NORMAL, 0, VertexFormat.F32x3);
+        assertTrue(mesh.schema().has(AttributeSemantic.NORMAL, 0));
+    }
+
+    @Test
+    void setVertexCountRejectsResizing() {
+        MeshData mesh = new MeshData(positionSchema(), 1);
+        assertThrows(UnsupportedOperationException.class, () -> mesh.setVertexCount(2));
+        mesh.setVertexCount(1);
+    }
+
+    @Test
     void validateFailsForMalformedSubmeshRange() {
         MeshData mesh = new MeshData(
             Topology.TRIANGLES,

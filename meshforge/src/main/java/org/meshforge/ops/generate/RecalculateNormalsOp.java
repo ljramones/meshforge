@@ -6,8 +6,6 @@ import org.meshforge.core.attr.VertexFormat;
 import org.meshforge.core.mesh.MeshData;
 import org.meshforge.ops.pipeline.MeshContext;
 import org.meshforge.ops.pipeline.MeshOp;
-import org.vectrix.core.Vector3f;
-
 import java.util.Arrays;
 
 public final class RecalculateNormalsOp implements MeshOp {
@@ -44,7 +42,20 @@ public final class RecalculateNormalsOp implements MeshOp {
         if (indices == null) {
             accumulateSequential(mesh.vertexCount(), positions, posComps, normalData, normalComps);
         } else {
-            accumulateIndexed(indices, positions, posComps, normalData, normalComps);
+            float clampedAngle = Math.max(0.0f, Math.min(180.0f, angleThresholdDeg));
+            if (clampedAngle >= 179.999f) {
+                accumulateIndexed(indices, positions, posComps, normalData, normalComps);
+            } else {
+                accumulateIndexedWithThreshold(
+                    indices,
+                    mesh.vertexCount(),
+                    positions,
+                    posComps,
+                    normalData,
+                    normalComps,
+                    clampedAngle
+                );
+            }
         }
 
         normalize(normalData, mesh.vertexCount(), normalComps);
@@ -83,6 +94,128 @@ public final class RecalculateNormalsOp implements MeshOp {
         }
     }
 
+    private static void accumulateIndexedWithThreshold(
+        int[] indices,
+        int vertexCount,
+        float[] positions,
+        int posComps,
+        float[] normalData,
+        int normalComps,
+        float angleThresholdDeg
+    ) {
+        int triCount = indices.length / 3;
+        float[] faceNx = new float[triCount];
+        float[] faceNy = new float[triCount];
+        float[] faceNz = new float[triCount];
+        int[] incidentCounts = new int[vertexCount];
+
+        for (int t = 0; t < triCount; t++) {
+            int a = indices[t * 3];
+            int b = indices[t * 3 + 1];
+            int c = indices[t * 3 + 2];
+            int ao = a * posComps;
+            int bo = b * posComps;
+            int co = c * posComps;
+
+            float ax = positions[ao];
+            float ay = positions[ao + 1];
+            float az = positions[ao + 2];
+            float bx = positions[bo];
+            float by = positions[bo + 1];
+            float bz = positions[bo + 2];
+            float cx = positions[co];
+            float cy = positions[co + 1];
+            float cz = positions[co + 2];
+
+            float e1x = bx - ax;
+            float e1y = by - ay;
+            float e1z = bz - az;
+            float e2x = cx - ax;
+            float e2y = cy - ay;
+            float e2z = cz - az;
+
+            faceNx[t] = e1y * e2z - e1z * e2y;
+            faceNy[t] = e1z * e2x - e1x * e2z;
+            faceNz[t] = e1x * e2y - e1y * e2x;
+
+            incidentCounts[a]++;
+            incidentCounts[b]++;
+            incidentCounts[c]++;
+        }
+
+        int[] offsets = new int[vertexCount + 1];
+        for (int v = 0; v < vertexCount; v++) {
+            offsets[v + 1] = offsets[v] + incidentCounts[v];
+        }
+        int[] cursor = offsets.clone();
+        int[] adjacency = new int[offsets[vertexCount]];
+        for (int t = 0; t < triCount; t++) {
+            int a = indices[t * 3];
+            int b = indices[t * 3 + 1];
+            int c = indices[t * 3 + 2];
+            adjacency[cursor[a]++] = t;
+            adjacency[cursor[b]++] = t;
+            adjacency[cursor[c]++] = t;
+        }
+
+        float cosThreshold = (float) Math.cos(Math.toRadians(angleThresholdDeg));
+        for (int v = 0; v < vertexCount; v++) {
+            int start = offsets[v];
+            int end = offsets[v + 1];
+            if (start >= end) {
+                continue;
+            }
+
+            float bestX = 0.0f;
+            float bestY = 0.0f;
+            float bestZ = 0.0f;
+            float bestLenSq = -1.0f;
+
+            for (int s = start; s < end; s++) {
+                int seedFace = adjacency[s];
+                float sx = faceNx[seedFace];
+                float sy = faceNy[seedFace];
+                float sz = faceNz[seedFace];
+                float seedLen = (float) Math.sqrt(sx * sx + sy * sy + sz * sz);
+                if (seedLen <= 1.0e-20f) {
+                    continue;
+                }
+
+                float sumX = 0.0f;
+                float sumY = 0.0f;
+                float sumZ = 0.0f;
+                for (int i = start; i < end; i++) {
+                    int face = adjacency[i];
+                    float fx = faceNx[face];
+                    float fy = faceNy[face];
+                    float fz = faceNz[face];
+                    float len = (float) Math.sqrt(fx * fx + fy * fy + fz * fz);
+                    if (len <= 1.0e-20f) {
+                        continue;
+                    }
+                    float dot = (sx * fx + sy * fy + sz * fz) / (seedLen * len);
+                    if (dot >= cosThreshold) {
+                        sumX += fx;
+                        sumY += fy;
+                        sumZ += fz;
+                    }
+                }
+
+                float lenSq = sumX * sumX + sumY * sumY + sumZ * sumZ;
+                if (lenSq > bestLenSq) {
+                    bestLenSq = lenSq;
+                    bestX = sumX;
+                    bestY = sumY;
+                    bestZ = sumZ;
+                }
+            }
+
+            if (bestLenSq > 1.0e-20f) {
+                accumulate(normalData, normalComps, v, bestX, bestY, bestZ);
+            }
+        }
+    }
+
     private static void accumulateTriangle(
         int ia,
         int ib,
@@ -108,13 +241,20 @@ public final class RecalculateNormalsOp implements MeshOp {
         float cy = positions[c + 1];
         float cz = positions[c + 2];
 
-        Vector3f e1 = new Vector3f(bx - ax, by - ay, bz - az);
-        Vector3f e2 = new Vector3f(cx - ax, cy - ay, cz - az);
-        Vector3f n = e1.cross(e2, new Vector3f());
+        float e1x = bx - ax;
+        float e1y = by - ay;
+        float e1z = bz - az;
+        float e2x = cx - ax;
+        float e2y = cy - ay;
+        float e2z = cz - az;
 
-        accumulate(normalData, normalComps, ia, n.x, n.y, n.z);
-        accumulate(normalData, normalComps, ib, n.x, n.y, n.z);
-        accumulate(normalData, normalComps, ic, n.x, n.y, n.z);
+        float nx = e1y * e2z - e1z * e2y;
+        float ny = e1z * e2x - e1x * e2z;
+        float nz = e1x * e2y - e1y * e2x;
+
+        accumulate(normalData, normalComps, ia, nx, ny, nz);
+        accumulate(normalData, normalComps, ib, nx, ny, nz);
+        accumulate(normalData, normalComps, ic, nx, ny, nz);
     }
 
     private static void accumulate(float[] normalData, int normalComps, int vertex, float x, float y, float z) {

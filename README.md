@@ -10,6 +10,12 @@ It provides a clear, layered workflow:
 
 MeshForge is renderer-agnostic and designed to pair naturally with **Vectrix** for math and numeric helpers.
 
+Core docs:
+
+- `API.md` (public API reference)
+- `TECHNOLOGY_EXPLAINER.md` (design rationale and integration model)
+- `docs/README.md` (full documentation index)
+
 ---
 
 # Concepts and Definitions
@@ -158,6 +164,12 @@ Loader format rollout planning is tracked in:
 
 ```
 docs/loader-roadmap.md
+```
+
+Stress/fuzz guarantees and fail-fast guardrails are documented in:
+
+```
+docs/stress-guarantees.md
 ```
 
 ---

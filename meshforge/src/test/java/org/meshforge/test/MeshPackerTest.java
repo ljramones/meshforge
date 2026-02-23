@@ -14,6 +14,7 @@ import org.meshforge.pack.packer.MeshPacker;
 import org.meshforge.pack.spec.PackSpec;
 import org.vectrix.core.Vector3f;
 import org.vectrix.gpu.OctaNormal;
+import org.vectrix.gpu.PackedNorm;
 
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -230,5 +231,41 @@ class MeshPackerTest {
         assertEquals(0.57735f, decoded.x(), 0.03f);
         assertEquals(0.57735f, decoded.y(), 0.03f);
         assertEquals(0.57735f, decoded.z(), 0.03f);
+    }
+
+    @Test
+    void realtimePackWritesSkinnedJointAndWeightBuffers() {
+        VertexSchema schema = VertexSchema.builder()
+            .add(AttributeSemantic.POSITION, 0, VertexFormat.F32x3)
+            .add(AttributeSemantic.JOINTS, 0, VertexFormat.I32x4)
+            .add(AttributeSemantic.WEIGHTS, 0, VertexFormat.F32x4)
+            .build();
+
+        MeshData mesh = new MeshData(
+            Topology.TRIANGLES,
+            schema,
+            1,
+            new int[] {0, 0, 0},
+            List.of(new Submesh(0, 3, "m"))
+        );
+        mesh.attribute(AttributeSemantic.POSITION, 0).set3f(0, 0.0f, 0.0f, 0.0f);
+        var joints = mesh.attribute(AttributeSemantic.JOINTS, 0);
+        joints.setInt(0, 0, 2);
+        joints.setInt(0, 1, 7);
+        joints.setInt(0, 2, 13);
+        joints.setInt(0, 3, 255);
+        var weights = mesh.attribute(AttributeSemantic.WEIGHTS, 0);
+        weights.set4f(0, 0.5f, 0.25f, 0.25f, 0.0f);
+
+        PackedMesh packed = MeshPacker.pack(mesh, PackSpec.realtime());
+        int jointsOff = packed.layout().entry(new AttributeKey(AttributeSemantic.JOINTS, 0)).offsetBytes();
+        int weightsOff = packed.layout().entry(new AttributeKey(AttributeSemantic.WEIGHTS, 0)).offsetBytes();
+        ByteBuffer vb = packed.vertexBuffer();
+
+        int packedJoints = vb.getInt(jointsOff);
+        int expectedJoints = (2 & 0xFF) | ((7 & 0xFF) << 8) | ((13 & 0xFF) << 16) | ((255 & 0xFF) << 24);
+        assertEquals(expectedJoints, packedJoints);
+        int packedWeights = vb.getInt(weightsOff);
+        assertEquals(PackedNorm.packUnorm8x4(0.5f, 0.25f, 0.25f, 0.0f), packedWeights);
     }
 }

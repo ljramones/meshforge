@@ -1,10 +1,13 @@
 package org.meshforge.ops.optimize;
 
 import org.meshforge.core.mesh.MeshData;
+import org.meshforge.core.mesh.Submesh;
 import org.meshforge.ops.pipeline.MeshContext;
 import org.meshforge.ops.pipeline.MeshOp;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * Forsyth-style vertex cache optimization for indexed triangle lists.
@@ -29,29 +32,93 @@ public final class OptimizeVertexCacheOp implements MeshOp {
             return mesh;
         }
 
-        Result result = optimize(indices, mesh.vertexCount(), cacheSize);
-        context.put("optimizeVertexCache.vertexRemap", result.vertexRemap());
+        int vertexCount = mesh.vertexCount();
+        int[] reorderedOldIndices;
+        List<Submesh> remappedSubmeshes = mesh.submeshes();
+        List<Submesh> sourceSubmeshes = mesh.submeshes();
+        if (sourceSubmeshes.isEmpty()) {
+            reorderedOldIndices = optimizeOrder(indices, vertexCount, cacheSize);
+        } else {
+            reorderedOldIndices = new int[indices.length];
+            remappedSubmeshes = new ArrayList<>(sourceSubmeshes.size());
+            int write = 0;
+            for (Submesh submesh : sourceSubmeshes) {
+                int first = submesh.firstIndex();
+                int count = submesh.indexCount();
+                if (first < 0 || count < 0 || first + count > indices.length) {
+                    throw new IllegalStateException("Submesh range exceeds index buffer");
+                }
+                if ((count % 3) != 0) {
+                    throw new IllegalStateException("Submesh indexCount must be divisible by 3");
+                }
+
+                int[] slice = Arrays.copyOfRange(indices, first, first + count);
+                int[] reorderedSlice = optimizeOrder(slice, vertexCount, cacheSize);
+                System.arraycopy(reorderedSlice, 0, reorderedOldIndices, write, reorderedSlice.length);
+                remappedSubmeshes.add(new Submesh(write, reorderedSlice.length, submesh.materialId()));
+                write += reorderedSlice.length;
+            }
+        }
+
+        int[] oldToNew = new int[vertexCount];
+        Arrays.fill(oldToNew, -1);
+        int[] compactedIndices = new int[reorderedOldIndices.length];
+        int nextVertex = 0;
+        for (int i = 0; i < reorderedOldIndices.length; i++) {
+            int oldIndex = reorderedOldIndices[i];
+            int mapped = oldToNew[oldIndex];
+            if (mapped < 0) {
+                mapped = nextVertex++;
+                oldToNew[oldIndex] = mapped;
+            }
+            compactedIndices[i] = mapped;
+        }
+
+        context.put("optimizeVertexCache.vertexRemap", oldToNew);
         context.put("optimizeVertexCache.acmrBefore", CacheMetrics.acmr(indices, cacheSize));
-        context.put("optimizeVertexCache.acmrAfter", CacheMetrics.acmr(result.indices(), cacheSize));
+        context.put("optimizeVertexCache.acmrAfter", CacheMetrics.acmr(compactedIndices, cacheSize));
 
         return CompactVerticesOp.reorderAndCompact(
             mesh,
-            result.indices(),
-            result.vertexRemap(),
-            result.vertexCount()
+            compactedIndices,
+            oldToNew,
+            nextVertex,
+            remappedSubmeshes
         );
     }
 
+    public static int[] optimizeOrder(int[] indices, int vertexCount, int cacheSize) {
+        return optimizeInternal(indices, vertexCount, cacheSize).reorderedIndices();
+    }
+
     public static Result optimize(int[] indices, int vertexCount, int cacheSize) {
+        InternalResult internal = optimizeInternal(indices, vertexCount, cacheSize);
+        int[] output = internal.reorderedIndices();
+        int[] oldToNew = new int[vertexCount];
+        Arrays.fill(oldToNew, -1);
+        int[] compactedIndices = new int[output.length];
+        int nextVertex = 0;
+        for (int i = 0; i < output.length; i++) {
+            int oldIndex = output[i];
+            int mapped = oldToNew[oldIndex];
+            if (mapped < 0) {
+                mapped = nextVertex++;
+                oldToNew[oldIndex] = mapped;
+            }
+            compactedIndices[i] = mapped;
+        }
+
+        return new Result(compactedIndices, oldToNew, nextVertex);
+    }
+
+    private static InternalResult optimizeInternal(int[] indices, int vertexCount, int cacheSize) {
         if ((indices.length % 3) != 0) {
             throw new IllegalArgumentException("Triangle index buffer length must be divisible by 3");
         }
 
         int triCount = indices.length / 3;
         if (triCount == 0) {
-            int[] identity = new int[vertexCount];
-            Arrays.fill(identity, -1);
-            return new Result(indices.clone(), identity, 0);
+            return new InternalResult(indices.clone());
         }
 
         int[] liveTriCount = new int[vertexCount];
@@ -183,21 +250,7 @@ public final class OptimizeVertexCacheOp implements MeshOp {
             }
         }
 
-        int[] oldToNew = new int[vertexCount];
-        Arrays.fill(oldToNew, -1);
-        int[] compactedIndices = new int[output.length];
-        int nextVertex = 0;
-        for (int i = 0; i < output.length; i++) {
-            int oldIndex = output[i];
-            int mapped = oldToNew[oldIndex];
-            if (mapped < 0) {
-                mapped = nextVertex++;
-                oldToNew[oldIndex] = mapped;
-            }
-            compactedIndices[i] = mapped;
-        }
-
-        return new Result(compactedIndices, oldToNew, nextVertex);
+        return new InternalResult(output);
     }
 
     private static int nextUnemitted(boolean[] emitted, int from) {
@@ -367,5 +420,8 @@ public final class OptimizeVertexCacheOp implements MeshOp {
     }
 
     public record Result(int[] indices, int[] vertexRemap, int vertexCount) {
+    }
+
+    private record InternalResult(int[] reorderedIndices) {
     }
 }

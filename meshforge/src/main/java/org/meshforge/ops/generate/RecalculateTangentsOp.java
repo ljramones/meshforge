@@ -71,7 +71,11 @@ public final class RecalculateTangentsOp implements MeshOp {
             t.set(tan1[to], tan1[to + 1], tan1[to + 2]);
 
             float ndott = n.dot(t);
-            t.sub(new Vector3f(n).mul(ndott));
+            t.set(
+                t.x() - n.x() * ndott,
+                t.y() - n.y() * ndott,
+                t.z() - n.z() * ndott
+            );
             if (t.lengthSquared() > 1.0e-20f) {
                 t.normalize();
             } else {
@@ -79,7 +83,10 @@ public final class RecalculateTangentsOp implements MeshOp {
             }
 
             c.set(n).cross(t);
-            float handedness = c.dot(tanVec(tan2, to, new Vector3f())) < 0.0f ? -1.0f : 1.0f;
+            float tan2x = tan2[to];
+            float tan2y = tan2[to + 1];
+            float tan2z = tan2[to + 2];
+            float handedness = c.x() * tan2x + c.y() * tan2y + c.z() * tan2z < 0.0f ? -1.0f : 1.0f;
 
             tanOut[out] = t.x;
             tanOut[out + 1] = t.y;
@@ -88,10 +95,6 @@ public final class RecalculateTangentsOp implements MeshOp {
         }
 
         return mesh;
-    }
-
-    private static Vector3f tanVec(float[] tan2, int offset, Vector3f out) {
-        return out.set(tan2[offset], tan2[offset + 1], tan2[offset + 2]);
     }
 
     private static void accumulate(
