@@ -30,7 +30,7 @@
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.11.4</junit.version>
-        <vectrix.version>1.10.9</vectrix.version>
+        <vectrix.version>1.10.12</vectrix.version>
     </properties>
 
     <dependencyManagement>
