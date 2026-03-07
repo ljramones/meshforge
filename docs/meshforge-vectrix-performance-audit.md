@@ -239,7 +239,7 @@ First-pass outcome (2026-03-07):
 
 ### MF-VX-11 Optimize MeshoptDecoder (Scratch Strategy)
 Priority: P1
-Status: Pending
+Status: In Progress (first pass completed 2026-03-07)
 
 Deliverables:
 
@@ -250,6 +250,17 @@ Deliverables:
 Acceptance:
 
 - Decoder avoids spray of short-lived arrays in repeated batch runs.
+
+First-pass outcome (2026-03-07):
+
+- Implemented decode allocation reductions for OCTAHEDRAL path:
+  - added reusable per-thread decompression scratch (`byte[]`)
+  - added `Lz4BlockDecompressor.decompressInto(...)` to avoid transient output array creation
+  - removed per-call `ByteBuffer` wrappers in octa decode loop
+  - fixed unconditional pre-decompress in `decode(...)` so octa path only decompresses once
+- Targeted benchmark reruns completed:
+  - full pass: `/tmp/mf_vx_meshopt_after_jmh.txt`
+  - octa-focused verification: `/tmp/mf_vx_meshopt_octa_after_jmh.txt`
 
 ### MF-VX-12 Vectrix Friction Log
 Priority: P0
@@ -448,6 +459,35 @@ Interpretation:
 
 - First-pass changes removed substantial repeated-call churn and reduced single-op allocations by about one-fifth.
 - Single-op bytes/op remain high, so further structural reduction of authoring/output materialization is still required before this path can be considered allocation-clean.
+
+## MeshoptDecoder First-Pass Delta (MF-VX-11)
+
+Baseline source: `/tmp/mf_vx_meshopt_jmh.txt`  
+After source: `/tmp/mf_vx_meshopt_octa_after_jmh.txt` (OCTAHEDRAL-focused verification)
+
+OCTAHEDRAL comparison (`avgt` mode):
+
+| Workload | Before time/op (ms) | After time/op (ms) | Before bytes/op | After bytes/op | bytes/op delta |
+|---|---:|---:|---:|---:|---:|
+| SMALL | 0.002 | 0.002 | 16440.055 | 12328.052 | -25.0% |
+| MEDIUM | 0.034 | 0.047 | 262312.786 | 196649.097 | -25.0% |
+| LARGE | 0.884 | 1.102 | 2097340.273 | 1572929.456 | -25.0% |
+| ATTRIBUTE_HEAVY | 0.361 | 0.337 | 1048752.343 | 786479.772 | -25.0% |
+
+OCTAHEDRAL repeated-batch (`avgt` mode):
+
+| Workload | Before batch bytes/op | After batch bytes/op | batch bytes/op delta |
+|---|---:|---:|---:|
+| SMALL | 16552.056 | 12328.053 | -25.5% |
+| MEDIUM | 262312.797 | 196649.118 | -25.0% |
+| LARGE | 2097338.250 | 1572928.531 | -25.0% |
+| ATTRIBUTE_HEAVY | 1048750.441 | 786480.737 | -25.0% |
+
+Interpretation:
+
+- OCTAHEDRAL path now avoids one full transient array per decode call; allocation profile matches expected single-output dominant shape.
+- `FILTER_NONE` path remains allocation-heavy by design because decode output is itself a new byte array payload.
+- Remaining structural options for `FILTER_NONE` would require API/ownership changes (for example caller-supplied output/scratch) and should be treated as a separate compatibility decision.
 
 ## GC Pressure Watchlist
 

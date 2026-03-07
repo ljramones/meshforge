@@ -21,8 +21,22 @@ public final class Lz4BlockDecompressor {
             throw new IllegalArgumentException("outputSize must be >= 0");
         }
         byte[] output = new byte[outputSize];
+        decompressInto(input, output);
+        return output;
+    }
+
+    /**
+     * Decompresses an LZ4 block into the provided output array.
+     *
+     * @param input compressed bytes
+     * @param output destination array sized to expected decompressed length
+     */
+    public static void decompressInto(byte[] input, byte[] output) {
+        Objects.requireNonNull(input, "input");
+        Objects.requireNonNull(output, "output");
         int inPos = 0;
         int outPos = 0;
+        int outputSize = output.length;
         while (inPos < input.length) {
             int token = u8(input[inPos++]);
 
@@ -74,7 +88,6 @@ public final class Lz4BlockDecompressor {
             throw new IllegalArgumentException(
                 "LZ4 output size mismatch: expected " + outputSize + " bytes, decoded " + outPos + " bytes");
         }
-        return output;
     }
 
     private static int u8(byte value) {

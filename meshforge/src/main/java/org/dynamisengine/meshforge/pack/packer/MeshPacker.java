@@ -94,31 +94,24 @@ public final class MeshPacker {
         int offset = 0;
         LinkedHashMap<AttributeKey, VertexLayout.Entry> entries = new LinkedHashMap<>();
 
-        offset = add(entries, offset, POSITION_0,
-            spec.targetFormat(AttributeSemantic.POSITION, 0));
+        offset = add(entries, offset, POSITION_0, spec.targetFormat(POSITION_0));
         if (normal != null) {
-            offset = add(entries, offset, NORMAL_0,
-                spec.targetFormat(AttributeSemantic.NORMAL, 0));
+            offset = add(entries, offset, NORMAL_0, spec.targetFormat(NORMAL_0));
         }
         if (tangent != null) {
-            offset = add(entries, offset, TANGENT_0,
-                spec.targetFormat(AttributeSemantic.TANGENT, 0));
+            offset = add(entries, offset, TANGENT_0, spec.targetFormat(TANGENT_0));
         }
         if (uv0 != null) {
-            offset = add(entries, offset, UV_0,
-                spec.targetFormat(AttributeSemantic.UV, 0));
+            offset = add(entries, offset, UV_0, spec.targetFormat(UV_0));
         }
         if (color0 != null) {
-            offset = add(entries, offset, COLOR_0,
-                spec.targetFormat(AttributeSemantic.COLOR, 0));
+            offset = add(entries, offset, COLOR_0, spec.targetFormat(COLOR_0));
         }
         if (joints0 != null) {
-            offset = add(entries, offset, JOINTS_0,
-                spec.targetFormat(AttributeSemantic.JOINTS, 0));
+            offset = add(entries, offset, JOINTS_0, spec.targetFormat(JOINTS_0));
         }
         if (weights0 != null) {
-            offset = add(entries, offset, WEIGHTS_0,
-                spec.targetFormat(AttributeSemantic.WEIGHTS, 0));
+            offset = add(entries, offset, WEIGHTS_0, spec.targetFormat(WEIGHTS_0));
         }
 
         int stride = align(offset, spec.alignmentBytes());
@@ -362,27 +355,33 @@ public final class MeshPacker {
                 skinPackNs = scaleSampledNs(skinPackNs, skinSamples, vertexCount);
             }
         } else {
-            if (posOff >= 0) {
-                writePositionPass(vertexBuffer, positionData, vertexCount, stride, posOff);
-            }
-            if (hasNormal) {
-                writeNormalPass(vertexBuffer, normalData, vertexCount, stride, normalOff, normalFormat);
-            }
-            if (hasTangent) {
-                writeTangentPass(vertexBuffer, tangentData, vertexCount, stride, tangentOff);
-            }
-            if (hasUv) {
-                writeUvPass(vertexBuffer, uvData, vertexCount, stride, uvOff);
-            }
-            if (hasColor) {
-                writeColorPass(vertexBuffer, colorData, vertexCount, stride, colorOff);
-            }
-            if (hasJoints) {
-                writeJointsPass(vertexBuffer, jointsData, joints0, vertexCount, stride, jointsOff);
-            }
-            if (hasWeights) {
-                writeWeightsPass(vertexBuffer, weightsData, vertexCount, stride, weightsOff);
-            }
+            writeFusedPass(
+                vertexBuffer,
+                vertexCount,
+                stride,
+                positionData,
+                posOff,
+                normalData,
+                hasNormal,
+                normalOff,
+                normalFormat,
+                tangentData,
+                hasTangent,
+                tangentOff,
+                uvData,
+                hasUv,
+                uvOff,
+                colorData,
+                hasColor,
+                colorOff,
+                jointsData,
+                joints0,
+                hasJoints,
+                jointsOff,
+                weightsData,
+                hasWeights,
+                weightsOff
+            );
         }
         if (profile != null) {
             profile.setVertexWriteNs(System.nanoTime() - vertexWriteStart);
@@ -540,6 +539,90 @@ public final class MeshPacker {
             int packed = PackedNorm.packUnorm8x4(
                 weightsData[src], weightsData[src + 1], weightsData[src + 2], weightsData[src + 3]);
             out.putInt((i * stride) + offset, packed);
+        }
+    }
+
+    private static void writeFusedPass(
+        ByteBuffer out,
+        int vertexCount,
+        int stride,
+        float[] positionData,
+        int posOff,
+        float[] normalData,
+        boolean hasNormal,
+        int normalOff,
+        VertexFormat normalFormat,
+        float[] tangentData,
+        boolean hasTangent,
+        int tangentOff,
+        float[] uvData,
+        boolean hasUv,
+        int uvOff,
+        float[] colorData,
+        boolean hasColor,
+        int colorOff,
+        int[] jointsData,
+        VertexAttributeView jointsView,
+        boolean hasJoints,
+        int jointsOff,
+        float[] weightsData,
+        boolean hasWeights,
+        int weightsOff
+    ) {
+        for (int i = 0; i < vertexCount; i++) {
+            int base = i * stride;
+            if (posOff >= 0) {
+                int src = i * 3;
+                out.putFloat(base + posOff, positionData[src]);
+                out.putFloat(base + posOff + 4, positionData[src + 1]);
+                out.putFloat(base + posOff + 8, positionData[src + 2]);
+            }
+            if (hasNormal) {
+                int src = i * 3;
+                writeNormal(out, base + normalOff, normalFormat, normalData[src], normalData[src + 1], normalData[src + 2]);
+            }
+            if (hasTangent) {
+                int src = i * 4;
+                int packed = packSnorm8x4Inline(
+                    tangentData[src], tangentData[src + 1], tangentData[src + 2], tangentData[src + 3]
+                );
+                out.putInt(base + tangentOff, packed);
+            }
+            if (hasUv) {
+                int src = i * 2;
+                out.putShort(base + uvOff, Half.pack(uvData[src]));
+                out.putShort(base + uvOff + 2, Half.pack(uvData[src + 1]));
+            }
+            if (hasColor) {
+                int src = i * 4;
+                int packed = PackedNorm.packUnorm8x4(
+                    colorData[src], colorData[src + 1], colorData[src + 2], colorData[src + 3]
+                );
+                out.putInt(base + colorOff, packed);
+            }
+            if (hasJoints) {
+                int packed;
+                if (jointsData != null) {
+                    int src = i * 4;
+                    packed = (jointsData[src] & 0xFF)
+                        | ((jointsData[src + 1] & 0xFF) << 8)
+                        | ((jointsData[src + 2] & 0xFF) << 16)
+                        | ((jointsData[src + 3] & 0xFF) << 24);
+                } else {
+                    packed = (jointsView.getInt(i, 0) & 0xFF)
+                        | ((jointsView.getInt(i, 1) & 0xFF) << 8)
+                        | ((jointsView.getInt(i, 2) & 0xFF) << 16)
+                        | ((jointsView.getInt(i, 3) & 0xFF) << 24);
+                }
+                out.putInt(base + jointsOff, packed);
+            }
+            if (hasWeights) {
+                int src = i * 4;
+                int packed = PackedNorm.packUnorm8x4(
+                    weightsData[src], weightsData[src + 1], weightsData[src + 2], weightsData[src + 3]
+                );
+                out.putInt(base + weightsOff, packed);
+            }
         }
     }
 

@@ -16,6 +16,86 @@ import java.util.Objects;
  * formats, optional meshlet generation, and validation behavior.
  */
 public final class PackSpec {
+    private static final PackSpec DEBUG_PRESET = builder()
+        .layout(LayoutMode.INTERLEAVED)
+        .alignment(16)
+        .indexPolicy(IndexPolicy.AUTO_16_IF_POSSIBLE)
+        .target(AttributeSemantic.POSITION, 0, VertexFormat.F32x3)
+        .target(AttributeSemantic.NORMAL, 0, VertexFormat.F32x3)
+        .target(AttributeSemantic.TANGENT, 0, VertexFormat.F32x4)
+        .target(AttributeSemantic.UV, 0, VertexFormat.F32x2)
+        .target(AttributeSemantic.COLOR, 0, VertexFormat.F32x4)
+        .target(AttributeSemantic.JOINTS, 0, VertexFormat.I32x4)
+        .target(AttributeSemantic.WEIGHTS, 0, VertexFormat.F32x4)
+        .dropUnknownAttributes(false)
+        .computeBoundsIfMissing(true)
+        .failIfMissingNormals(false)
+        .failIfMissingTangents(false)
+        .build();
+    private static final PackSpec REALTIME_PRESET = builder()
+        .layout(LayoutMode.INTERLEAVED)
+        .alignment(16)
+        .indexPolicy(IndexPolicy.AUTO_16_IF_POSSIBLE)
+        .target(AttributeSemantic.POSITION, 0, VertexFormat.F32x3)
+        .normalPacking(NormalPacking.SNORM8x4)
+        .target(AttributeSemantic.NORMAL, 0, VertexFormat.SNORM8x4)
+        .target(AttributeSemantic.TANGENT, 0, VertexFormat.SNORM8x4)
+        .target(AttributeSemantic.UV, 0, VertexFormat.F16x2)
+        .target(AttributeSemantic.COLOR, 0, VertexFormat.UNORM8x4)
+        .target(AttributeSemantic.JOINTS, 0, VertexFormat.U8x4)
+        .target(AttributeSemantic.WEIGHTS, 0, VertexFormat.UNORM8x4)
+        .dropUnknownAttributes(true)
+        .computeBoundsIfMissing(true)
+        .failIfMissingNormals(false)
+        .failIfMissingTangents(false)
+        .build();
+    private static final PackSpec REALTIME_WITH_MESHLETS_PRESET = builder()
+        .layout(LayoutMode.INTERLEAVED)
+        .alignment(16)
+        .indexPolicy(IndexPolicy.AUTO_16_IF_POSSIBLE)
+        .target(AttributeSemantic.POSITION, 0, VertexFormat.F32x3)
+        .normalPacking(NormalPacking.SNORM8x4)
+        .target(AttributeSemantic.NORMAL, 0, VertexFormat.SNORM8x4)
+        .target(AttributeSemantic.TANGENT, 0, VertexFormat.SNORM8x4)
+        .target(AttributeSemantic.UV, 0, VertexFormat.F16x2)
+        .target(AttributeSemantic.COLOR, 0, VertexFormat.UNORM8x4)
+        .target(AttributeSemantic.JOINTS, 0, VertexFormat.U8x4)
+        .target(AttributeSemantic.WEIGHTS, 0, VertexFormat.UNORM8x4)
+        .dropUnknownAttributes(true)
+        .computeBoundsIfMissing(true)
+        .failIfMissingNormals(false)
+        .failIfMissingTangents(false)
+        .meshletsEnabled(true)
+        .maxMeshletVertices(128)
+        .maxMeshletTriangles(64)
+        .build();
+    private static final PackSpec REALTIME_WITH_OCTA_NORMALS_PRESET = builder()
+        .layout(LayoutMode.INTERLEAVED)
+        .alignment(16)
+        .indexPolicy(IndexPolicy.AUTO_16_IF_POSSIBLE)
+        .target(AttributeSemantic.POSITION, 0, VertexFormat.F32x3)
+        .normalPacking(NormalPacking.OCTA_SNORM16x2)
+        .target(AttributeSemantic.NORMAL, 0, VertexFormat.OCTA_SNORM16x2)
+        .target(AttributeSemantic.TANGENT, 0, VertexFormat.SNORM8x4)
+        .target(AttributeSemantic.UV, 0, VertexFormat.F16x2)
+        .target(AttributeSemantic.COLOR, 0, VertexFormat.UNORM8x4)
+        .target(AttributeSemantic.JOINTS, 0, VertexFormat.U8x4)
+        .target(AttributeSemantic.WEIGHTS, 0, VertexFormat.UNORM8x4)
+        .dropUnknownAttributes(true)
+        .computeBoundsIfMissing(true)
+        .failIfMissingNormals(false)
+        .failIfMissingTangents(false)
+        .build();
+    private static final PackSpec REALTIME_MINIMAL_PRESET = builder()
+        .layout(LayoutMode.INTERLEAVED)
+        .alignment(16)
+        .indexPolicy(IndexPolicy.AUTO_16_IF_POSSIBLE)
+        .target(AttributeSemantic.POSITION, 0, VertexFormat.F32x3)
+        .dropUnknownAttributes(true)
+        .computeBoundsIfMissing(true)
+        .failIfMissingNormals(false)
+        .failIfMissingTangents(false)
+        .build();
     /**
      * Vertex buffer layout strategy.
      */
@@ -166,6 +246,16 @@ public final class PackSpec {
     }
 
     /**
+     * Looks up one target format using a stable key.
+     *
+     * @param key attribute key
+     * @return target format or {@code null}
+     */
+    public VertexFormat targetFormat(AttributeKey key) {
+        return targetFormats.get(key);
+    }
+
+    /**
      * Creates builder.
      * @return resulting value
      */
@@ -178,22 +268,7 @@ public final class PackSpec {
      * @return resulting value
      */
     public static PackSpec debug() {
-        return builder()
-            .layout(LayoutMode.INTERLEAVED)
-            .alignment(16)
-            .indexPolicy(IndexPolicy.AUTO_16_IF_POSSIBLE)
-            .target(AttributeSemantic.POSITION, 0, VertexFormat.F32x3)
-            .target(AttributeSemantic.NORMAL, 0, VertexFormat.F32x3)
-            .target(AttributeSemantic.TANGENT, 0, VertexFormat.F32x4)
-            .target(AttributeSemantic.UV, 0, VertexFormat.F32x2)
-            .target(AttributeSemantic.COLOR, 0, VertexFormat.F32x4)
-            .target(AttributeSemantic.JOINTS, 0, VertexFormat.I32x4)
-            .target(AttributeSemantic.WEIGHTS, 0, VertexFormat.F32x4)
-            .dropUnknownAttributes(false)
-            .computeBoundsIfMissing(true)
-            .failIfMissingNormals(false)
-            .failIfMissingTangents(false)
-            .build();
+        return DEBUG_PRESET;
     }
 
     /**
@@ -201,23 +276,7 @@ public final class PackSpec {
      * @return resulting value
      */
     public static PackSpec realtime() {
-        return builder()
-            .layout(LayoutMode.INTERLEAVED)
-            .alignment(16)
-            .indexPolicy(IndexPolicy.AUTO_16_IF_POSSIBLE)
-            .target(AttributeSemantic.POSITION, 0, VertexFormat.F32x3)
-            .normalPacking(NormalPacking.SNORM8x4)
-            .target(AttributeSemantic.NORMAL, 0, VertexFormat.SNORM8x4)
-            .target(AttributeSemantic.TANGENT, 0, VertexFormat.SNORM8x4)
-            .target(AttributeSemantic.UV, 0, VertexFormat.F16x2)
-            .target(AttributeSemantic.COLOR, 0, VertexFormat.UNORM8x4)
-            .target(AttributeSemantic.JOINTS, 0, VertexFormat.U8x4)
-            .target(AttributeSemantic.WEIGHTS, 0, VertexFormat.UNORM8x4)
-            .dropUnknownAttributes(true)
-            .computeBoundsIfMissing(true)
-            .failIfMissingNormals(false)
-            .failIfMissingTangents(false)
-            .build();
+        return REALTIME_PRESET;
     }
 
     /**
@@ -238,16 +297,7 @@ public final class PackSpec {
      * @return minimal runtime pack preset
      */
     public static PackSpec realtimeMinimal() {
-        return builder()
-            .layout(LayoutMode.INTERLEAVED)
-            .alignment(16)
-            .indexPolicy(IndexPolicy.AUTO_16_IF_POSSIBLE)
-            .target(AttributeSemantic.POSITION, 0, VertexFormat.F32x3)
-            .dropUnknownAttributes(true)
-            .computeBoundsIfMissing(true)
-            .failIfMissingNormals(false)
-            .failIfMissingTangents(false)
-            .build();
+        return REALTIME_MINIMAL_PRESET;
     }
 
     /**
@@ -255,26 +305,7 @@ public final class PackSpec {
      * @return resulting value
      */
     public static PackSpec realtimeWithMeshlets() {
-        return builder()
-            .layout(LayoutMode.INTERLEAVED)
-            .alignment(16)
-            .indexPolicy(IndexPolicy.AUTO_16_IF_POSSIBLE)
-            .target(AttributeSemantic.POSITION, 0, VertexFormat.F32x3)
-            .normalPacking(NormalPacking.SNORM8x4)
-            .target(AttributeSemantic.NORMAL, 0, VertexFormat.SNORM8x4)
-            .target(AttributeSemantic.TANGENT, 0, VertexFormat.SNORM8x4)
-            .target(AttributeSemantic.UV, 0, VertexFormat.F16x2)
-            .target(AttributeSemantic.COLOR, 0, VertexFormat.UNORM8x4)
-            .target(AttributeSemantic.JOINTS, 0, VertexFormat.U8x4)
-            .target(AttributeSemantic.WEIGHTS, 0, VertexFormat.UNORM8x4)
-            .dropUnknownAttributes(true)
-            .computeBoundsIfMissing(true)
-            .failIfMissingNormals(false)
-            .failIfMissingTangents(false)
-            .meshletsEnabled(true)
-            .maxMeshletVertices(128)
-            .maxMeshletTriangles(64)
-            .build();
+        return REALTIME_WITH_MESHLETS_PRESET;
     }
 
     /**
@@ -282,23 +313,7 @@ public final class PackSpec {
      * @return resulting value
      */
     public static PackSpec realtimeWithOctaNormals() {
-        return builder()
-            .layout(LayoutMode.INTERLEAVED)
-            .alignment(16)
-            .indexPolicy(IndexPolicy.AUTO_16_IF_POSSIBLE)
-            .target(AttributeSemantic.POSITION, 0, VertexFormat.F32x3)
-            .normalPacking(NormalPacking.OCTA_SNORM16x2)
-            .target(AttributeSemantic.NORMAL, 0, VertexFormat.OCTA_SNORM16x2)
-            .target(AttributeSemantic.TANGENT, 0, VertexFormat.SNORM8x4)
-            .target(AttributeSemantic.UV, 0, VertexFormat.F16x2)
-            .target(AttributeSemantic.COLOR, 0, VertexFormat.UNORM8x4)
-            .target(AttributeSemantic.JOINTS, 0, VertexFormat.U8x4)
-            .target(AttributeSemantic.WEIGHTS, 0, VertexFormat.UNORM8x4)
-            .dropUnknownAttributes(true)
-            .computeBoundsIfMissing(true)
-            .failIfMissingNormals(false)
-            .failIfMissingTangents(false)
-            .build();
+        return REALTIME_WITH_OCTA_NORMALS_PRESET;
     }
 
     /**
