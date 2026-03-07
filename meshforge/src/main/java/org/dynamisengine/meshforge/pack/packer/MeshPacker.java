@@ -609,6 +609,20 @@ public final class MeshPacker {
      * @param workspace caller-owned reusable workspace/destination
      */
     public static void packInto(MeshData mesh, PackSpec spec, RuntimePackWorkspace workspace) {
+        packVertexPayloadInto(mesh, spec, workspace);
+        packIndexPayloadInto(mesh, spec, workspace);
+        captureSubmeshMetadata(mesh, workspace);
+    }
+
+    /**
+     * Runtime-oriented vertex payload kernel: writes packed vertex bytes into caller-owned workspace.
+     * This excludes index packing and submesh metadata materialization.
+     *
+     * @param mesh source mesh
+     * @param spec pack spec
+     * @param workspace caller-owned workspace
+     */
+    public static void packVertexPayloadInto(MeshData mesh, PackSpec spec, RuntimePackWorkspace workspace) {
         if (workspace == null) {
             throw new NullPointerException("workspace");
         }
@@ -739,14 +753,37 @@ public final class MeshPacker {
             hasWeights,
             weightsOff
         );
+    }
 
+    /**
+     * Runtime-oriented index payload kernel: writes packed index bytes into caller-owned workspace.
+     *
+     * @param mesh source mesh
+     * @param spec pack spec
+     * @param workspace caller-owned workspace
+     */
+    public static void packIndexPayloadInto(MeshData mesh, PackSpec spec, RuntimePackWorkspace workspace) {
+        if (workspace == null) {
+            throw new NullPointerException("workspace");
+        }
         int[] indices = mesh.indicesOrNull();
         if (indices == null || indices.length == 0) {
             workspace.clearIndexPayload();
-        } else {
-            packIndicesInto(indices, spec.indexPolicy(), workspace);
+            return;
         }
+        packIndicesInto(indices, spec.indexPolicy(), workspace);
+    }
 
+    /**
+     * Captures submesh metadata in caller-owned reusable workspace arrays.
+     *
+     * @param mesh source mesh
+     * @param workspace caller-owned workspace
+     */
+    public static void captureSubmeshMetadata(MeshData mesh, RuntimePackWorkspace workspace) {
+        if (workspace == null) {
+            throw new NullPointerException("workspace");
+        }
         workspace.setSubmeshes(mesh.submeshes());
     }
 

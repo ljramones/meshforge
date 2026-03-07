@@ -127,6 +127,12 @@ public class VectrixHotPathBaselineBenchmark {
     }
 
     @Benchmark
+    public void meshPackerRealtimeRuntimeVertexOnly(MeshState state, Blackhole bh) {
+        MeshPacker.packVertexPayloadInto(state.template, PackSpec.realtime(), state.packWorkspace);
+        bh.consume(state.packWorkspace.vertexBytes());
+    }
+
+    @Benchmark
     public void recalculateTangentsRuntime(MeshState state, Blackhole bh) {
         MeshData out = state.tangentOp.applyWithWorkspace(state.working, state.tangentContext, state.tangentWorkspace);
         bh.consume(out.attributeFormats().size());
@@ -168,6 +174,15 @@ public class VectrixHotPathBaselineBenchmark {
     public void meshPackerRealtimeRuntimeBatch(MeshState state, Blackhole bh) {
         for (int i = 0; i < BATCH_SIZE; i++) {
             MeshPacker.packInto(state.template, PackSpec.realtime(), state.packWorkspace);
+            bh.consume(state.packWorkspace.vertexBytes());
+        }
+    }
+
+    @Benchmark
+    @OperationsPerInvocation(BATCH_SIZE)
+    public void meshPackerRealtimeRuntimeVertexOnlyBatch(MeshState state, Blackhole bh) {
+        for (int i = 0; i < BATCH_SIZE; i++) {
+            MeshPacker.packVertexPayloadInto(state.template, PackSpec.realtime(), state.packWorkspace);
             bh.consume(state.packWorkspace.vertexBytes());
         }
     }

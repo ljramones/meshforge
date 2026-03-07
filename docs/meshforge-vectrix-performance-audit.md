@@ -606,6 +606,56 @@ Interpretation:
 - Keep workspace-enabled overload as runtime path when caller controls execution context/scratch reuse.
 - Further gains likely require broader dataflow changes outside tangent math kernel itself.
 
+## Sprint B Destination Ownership Split (2026-03-07)
+
+Source: `/tmp/mf_sprintB_meshpacker_split_jmh.txt`  
+Settings: `forks=0`, `wi=1`, `i=2`, `-w 300ms`, `-r 300ms`, `-prof gc`
+
+Implemented split:
+
+- `MeshPacker.packVertexPayloadInto(...)` (kernel payload path)
+- `MeshPacker.packIndexPayloadInto(...)`
+- `MeshPacker.captureSubmeshMetadata(...)`
+- `MeshPacker.packInto(...)` now composes the three phases
+
+Benchmark lanes:
+
+- friendly API: `meshPackerRealtime*`
+- runtime full path: `meshPackerRealtimeRuntime*`
+- runtime kernel path (vertex payload only): `meshPackerRealtimeRuntimeVertexOnly*`
+
+### Sprint B Findings
+
+`indexed=false` single-op (`avgt`, `B/op`):
+
+| Workload | Runtime full B/op | Runtime vertex-only B/op | delta |
+|---|---:|---:|---:|
+| SMALL | 108152.765 | 108152.762 | ~=0 |
+| MEDIUM | 1601155.118 | 1601155.031 | ~=0 |
+| LARGE | 9895611.064 | 9895610.164 | ~=0 |
+| ATTRIBUTE_HEAVY | 6344355.664 | 6344355.000 | ~=0 |
+
+`indexed=true` single-op (`avgt`, `B/op`):
+
+| Workload | Runtime full B/op | Runtime vertex-only B/op | delta |
+|---|---:|---:|---:|
+| SMALL | 157432.842 | 157432.794 | ~=0 |
+| MEDIUM | 2387715.929 | 2387715.276 | ~=0 |
+| LARGE | 14810945.768 | 14810940.373 | ~=0 |
+| ATTRIBUTE_HEAVY | 9490216.334 | 9490212.784 | ~=0 |
+
+Interpretation:
+
+- Splitting byte-production phases confirms remaining allocation is overwhelmingly final payload bytes.
+- Index/submesh metadata assembly contributes negligible `B/op` relative to payload at these mesh sizes.
+- API/runtime-path shape still improves throughput (runtime full and runtime vertex-only are faster), but not allocation magnitude.
+
+### Sprint B Contract Decision
+
+- Keep friendly `PackedMesh` API for general callers/tooling.
+- Keep and formalize runtime API (`packInto` + phase methods) for engine/world-construction paths.
+- Treat further allocation reduction as requiring contract-level ownership changes (for example persistent destination pools or externally managed payload lifetimes), not micro cleanup.
+
 ## GC Pressure Watchlist
 
 - Do not create temporary vector/wrapper objects in inner loops.
