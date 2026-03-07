@@ -689,6 +689,33 @@ Interpretation:
 - Remaining runtime-path allocation is now sub-kilobyte and mostly fixed per-call overhead.
 - JDK 25 preview path remains enabled for these runs (`--enable-preview`, vector module), and current gains come from data/access shape rather than speculative JVM-specific tricks.
 
+## D1 Fixed-Overhead Squeeze (2026-03-07)
+
+Source: `/tmp/mf_d1_lookup_jmh.txt`
+
+Changes:
+
+- Added `MeshData.attributeOrNull(AttributeKey)` and switched hot pack/tangent access from double-lookup (`has` + `attribute`) to single lookup.
+- This removes remaining per-call key/map overhead in pack-prep paths.
+
+`indexed=false` (`avgt`, `B/op`):
+
+| Mode | SMALL | MEDIUM | LARGE | ATTRIBUTE_HEAVY |
+|---|---:|---:|---:|---:|
+| Friendly `pack(...)` | 2112.349 | 2117.054 | 2143.249 | 2132.035 |
+| Runtime `packInto(...)` | 504.278 | 508.116 | 529.234 | 520.074 |
+| Runtime pooled | 504.278 | 508.097 | 529.053 | 520.243 |
+| Runtime vertex-only | 504.274 | 508.092 | 529.281 | 520.130 |
+
+`indexed=true` remains in the same pattern and scale.
+
+Interpretation:
+
+- Runtime path improved again from ~`672–703 B/op` to ~`504–529 B/op`.
+- Friendly path also dropped to ~`2112–2143 B/op`.
+- Runtime vs friendly split remains strong (~4x lower allocation in packer runtime path on corrected runs).
+- Pool wrapper still provides no additional reduction beyond direct runtime workspace reuse.
+
 ## GC Pressure Watchlist
 
 - Do not create temporary vector/wrapper objects in inner loops.

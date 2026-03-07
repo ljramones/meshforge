@@ -311,6 +311,20 @@ public final class MeshData {
     }
 
     /**
+     * Returns a mutable view for the requested schema attribute key or {@code null} when absent.
+     *
+     * @param key attribute key
+     * @return mutable attribute view or {@code null}
+     */
+    public VertexAttributeView attributeOrNull(AttributeKey key) {
+        if (key == null) {
+            throw new NullPointerException("key");
+        }
+        AttributeStorage storage = attributes.get(key);
+        return storage == null ? null : storage.view();
+    }
+
+    /**
      * Adds addAttribute.
      * @param semantic parameter value
      * @param setIndex parameter value

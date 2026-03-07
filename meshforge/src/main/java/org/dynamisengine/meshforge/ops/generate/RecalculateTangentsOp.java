@@ -242,10 +242,11 @@ public final class RecalculateTangentsOp implements MeshOp {
     }
 
     private static VertexAttributeView require(MeshData mesh, AttributeKey key) {
-        if (!mesh.has(key)) {
+        VertexAttributeView view = mesh.attributeOrNull(key);
+        if (view == null) {
             throw new IllegalStateException("Missing required attribute: " + key.semantic() + "[" + key.setIndex() + "]");
         }
-        return mesh.attribute(key);
+        return view;
     }
 
     private static float[] requireFloat(VertexAttributeView view, String label) {
