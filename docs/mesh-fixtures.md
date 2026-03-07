@@ -47,7 +47,7 @@ mvn -pl meshforge-demo javafx:run
 CLI demo:
 
 ```bash
-mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.MeshForgeDemo -Dexec.args="fixtures/obj/medium/suzanne.obj" exec:java
+mvn -pl meshforge-demo -Dexec.mainClass=org.dynamisengine.meshforge.demo.MeshForgeDemo -Dexec.args="fixtures/obj/medium/suzanne.obj" exec:java
 ```
 
 Loader tests should keep tiny inline fixtures for deterministic unit coverage and use `fixtures/` for integration samples.

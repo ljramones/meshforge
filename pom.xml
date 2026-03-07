@@ -4,12 +4,20 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>org.meshforge</groupId>
+    <parent>
+        <groupId>org.dynamisengine</groupId>
+        <artifactId>dynamis-parent</artifactId>
+        <version>1.0.0</version>
+        <relativePath>../dynamis-parent/pom.xml</relativePath>
+    </parent>
+
+    <groupId>org.dynamisengine</groupId>
     <artifactId>meshforge-parent</artifactId>
     <version>1.1.0</version>
     <packaging>pom</packaging>
     <name>MeshForge Parent</name>
     <description>MeshForge parent build for mesh processing and packing modules.</description>
+    <url>https://github.com/ljramones/MeshForge</url>
 
     <licenses>
         <license>
@@ -18,6 +26,20 @@
             <distribution>repo</distribution>
         </license>
     </licenses>
+
+    <developers>
+        <developer>
+            <name>Larry Mitchell</name>
+            <email>eviljinious1@gmail.com</email>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/ljramones/MeshForge.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/ljramones/MeshForge.git</developerConnection>
+        <url>https://github.com/ljramones/MeshForge</url>
+        <tag>HEAD</tag>
+    </scm>
 
     <modules>
         <module>meshforge</module>
@@ -30,7 +52,7 @@
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.11.4</junit.version>
-        <vectrix.version>1.10.12</vectrix.version>
+        <vectrix.version>1.10.13</vectrix.version>
     </properties>
 
     <dependencyManagement>
@@ -42,7 +64,7 @@
                 <scope>test</scope>
             </dependency>
             <dependency>
-                <groupId>org.vectrix</groupId>
+                <groupId>org.dynamisengine</groupId>
                 <artifactId>vectrix</artifactId>
                 <version>${vectrix.version}</version>
             </dependency>

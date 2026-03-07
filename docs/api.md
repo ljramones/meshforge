@@ -13,7 +13,7 @@ Canonical top-level API reference: `API.md`.
 
 ## Core Types
 
-### Authoring (`org.meshforge.core.*`)
+### Authoring (`org.dynamisengine.meshforge.core.*`)
 - `MeshData`
 - `Topology`
 - `Submesh`
@@ -23,7 +23,7 @@ Canonical top-level API reference: `API.md`.
 - `MeshWriter`
 - `MorphTarget`
 
-### Processing (`org.meshforge.ops.*`)
+### Processing (`org.dynamisengine.meshforge.ops.*`)
 - `MeshOp`
 - `MeshPipeline`
 - `MeshContext`
@@ -34,7 +34,7 @@ Common operation families:
 - modify (weld, compact, triangulate)
 - optimize (cache reorder, meshlet cluster/order)
 
-### Packing (`org.meshforge.pack.*`)
+### Packing (`org.dynamisengine.meshforge.pack.*`)
 - `PackSpec`
 - `MeshPacker`
 - `PackedMesh`
@@ -46,7 +46,7 @@ Implementation note:
 - `PackSpec.LayoutMode.MULTI_STREAM` is declared.
 - `MeshPacker` currently supports `INTERLEAVED` output only and fails fast for other layout modes.
 
-## Convenience Facade (`org.meshforge.api`)
+## Convenience Facade (`org.dynamisengine.meshforge.api`)
 
 - `Meshes`
 - `Ops`

@@ -177,9 +177,9 @@ docs/stress-guarantees.md
 # Quick Start
 
 ```java
-import org.meshforge.api.*;
-import org.meshforge.core.mesh.*;
-import org.meshforge.core.topology.*;
+import org.dynamisengine.meshforge.api.*;
+import org.dynamisengine.meshforge.core.mesh.*;
+import org.dynamisengine.meshforge.core.topology.*;
 
 MeshData mesh = Meshes.builder(Topology.TRIANGLES)
     .schema(VertexSchema.standardLit())
@@ -213,18 +213,18 @@ PackedMesh packedOcta = MeshPacker.pack(mesh, Packers.realtimeWithOctaNormals())
 Single Maven artifact:
 
 ```
-org.meshforge:meshforge
+org.dynamisengine:meshforge
 ```
 
 Layered packages:
 
 ```
-org.meshforge.api
-org.meshforge.core.*
-org.meshforge.ops.*
-org.meshforge.pack.*
-org.meshforge.loader.*            (in meshforge-loader module)
-org.meshforge.loader.gltf.*       (in meshforge-loader module)
+org.dynamisengine.meshforge.api
+org.dynamisengine.meshforge.core.*
+org.dynamisengine.meshforge.ops.*
+org.dynamisengine.meshforge.pack.*
+org.dynamisengine.meshforge.loader.*            (in meshforge-loader module)
+org.dynamisengine.meshforge.loader.gltf.*       (in meshforge-loader module)
 ```
 
 Guidelines:
@@ -331,17 +331,17 @@ Prerequisite (fresh checkout or after API changes):
 mvn -pl meshforge,meshforge-loader -DskipTests install
 ```
 
-1. `org.meshforge.demo.MeshForgeDemo` (CLI)
+1. `org.dynamisengine.meshforge.demo.MeshForgeDemo` (CLI)
 - Loads one mesh file through `meshforge-loader`
 - Runs the fast realtime pipeline (`Pipelines.realtimeFast`)
 - Packs with `Packers.realtime` and prints mesh/packing stats
 - Run:
 
 ```bash
-mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.MeshForgeDemo -Dexec.args="fixtures/obj/medium/suzanne.obj" exec:java
+mvn -pl meshforge-demo -Dexec.mainClass=org.dynamisengine.meshforge.demo.MeshForgeDemo -Dexec.args="fixtures/obj/medium/suzanne.obj" exec:java
 ```
 
-2. `org.meshforge.demo.MeshViewerApp` (JavaFX viewer)
+2. `org.dynamisengine.meshforge.demo.MeshViewerApp` (JavaFX viewer)
 - File-open UI for `*.obj`, `*.stl`, `*.ply`, `*.off`
 - Loads via `MeshLoaders.defaults()`, processes with `Pipelines.realtimeFast`, validates packing path
 - Displays the mesh in a JavaFX viewport (left-drag orbit, right-drag pan, wheel zoom)
@@ -351,7 +351,7 @@ mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.MeshForgeDemo -Dexec.
 mvn -pl meshforge-demo javafx:run
 ```
 
-3. `org.meshforge.demo.MeshletDispatchDemo` and `org.meshforge.demo.VulkanPreflight`
+3. `org.dynamisengine.meshforge.demo.MeshletDispatchDemo` and `org.dynamisengine.meshforge.demo.VulkanPreflight`
 - These are optional experimental harnesses under `meshforge-demo` only.
 - They are intentionally non-contract and not required for using MeshForge as a mesh manipulation library.
 
@@ -423,7 +423,7 @@ Command (run from repo root):
 
 ```bash
 mvn -pl meshforge-demo -DskipTests compile
-mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.BaselineFixtureTiming exec:java
+mvn -pl meshforge-demo -Dexec.mainClass=org.dynamisengine.meshforge.demo.BaselineFixtureTiming exec:java
 ```
 
 Definitions:
@@ -456,17 +456,17 @@ Command:
 
 ```bash
 mvn -pl meshforge-demo -DskipTests compile
-mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--legacy" exec:java
-mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast" exec:java
-mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast --pack-minimal" exec:java
+mvn -pl meshforge-demo -Dexec.mainClass=org.dynamisengine.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--legacy" exec:java
+mvn -pl meshforge-demo -Dexec.mainClass=org.dynamisengine.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast" exec:java
+mvn -pl meshforge-demo -Dexec.mainClass=org.dynamisengine.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast --pack-minimal" exec:java
 # parse-only profiling loop for loader optimization work (Part 2)
-mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast --parse-only --fixture=RevitHouse --warmup=5 --runs=15" exec:java
+mvn -pl meshforge-demo -Dexec.mainClass=org.dynamisengine.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast --parse-only --fixture=RevitHouse --warmup=5 --runs=15" exec:java
 # include parser sub-phase breakdown (scan/float/face) in console + CSV
-mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast --parse-only --profile-parse --fixture=RevitHouse --warmup=5 --runs=15" exec:java
+mvn -pl meshforge-demo -Dexec.mainClass=org.dynamisengine.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast --parse-only --profile-parse --fixture=RevitHouse --warmup=5 --runs=15" exec:java
 # compare two phase-split CSV snapshots
-mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitDiff -Dexec.args="perf/results/phase-split-fast-OLD.csv perf/results/phase-split-fast-NEW.csv" exec:java
+mvn -pl meshforge-demo -Dexec.mainClass=org.dynamisengine.meshforge.demo.PhaseSplitDiff -Dexec.args="perf/results/phase-split-fast-OLD.csv perf/results/phase-split-fast-NEW.csv" exec:java
 # compare with regression gate (fails if total delta > 10%)
-mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitDiff -Dexec.args="perf/results/phase-split-fast-OLD.csv perf/results/phase-split-fast-NEW.csv --max-regression-pct=10 --fixture=RevitHouse" exec:java
+mvn -pl meshforge-demo -Dexec.mainClass=org.dynamisengine.meshforge.demo.PhaseSplitDiff -Dexec.args="perf/results/phase-split-fast-OLD.csv perf/results/phase-split-fast-NEW.csv --max-regression-pct=10 --fixture=RevitHouse" exec:java
 ```
 
 Latest fast-loader snapshot (February 22, 2026, local machine run):
@@ -515,14 +515,14 @@ Command:
 
 ```bash
 mvn -pl meshforge-demo -DskipTests compile
-mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PackBreakdownFixtureTiming -Dexec.args="--fast" exec:java
-mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PackBreakdownFixtureTiming -Dexec.args="--fast --pack-minimal" exec:java
+mvn -pl meshforge-demo -Dexec.mainClass=org.dynamisengine.meshforge.demo.PackBreakdownFixtureTiming -Dexec.args="--fast" exec:java
+mvn -pl meshforge-demo -Dexec.mainClass=org.dynamisengine.meshforge.demo.PackBreakdownFixtureTiming -Dexec.args="--fast --pack-minimal" exec:java
 ```
 
 Shortcut from phase-split runner:
 
 ```bash
-mvn -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast --profile-pack" exec:java
+mvn -pl meshforge-demo -Dexec.mainClass=org.dynamisengine.meshforge.demo.PhaseSplitFixtureTiming -Dexec.args="--fast --profile-pack" exec:java
 ```
 
 CSV output is written to `perf/results/pack-breakdown-*.csv` with per-fixture medians/p95 and normalized totals.

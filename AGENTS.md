@@ -1,12 +1,12 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-This repository is a Maven Java library (`org.meshforge:meshforge`). Keep production code in `src/main/java/org/meshforge` and tests in `src/test/java/org/meshforge`.
+This repository is a Maven Java library (`org.dynamisengine:meshforge`). Keep production code under `*/src/main/java/org/dynamisengine/meshforge` and tests under `*/src/test/java/org/dynamisengine/meshforge`.
 
 - `src/test/resources/meshes/`: sample mesh fixtures (for example `cube.obj`).
 - `target/`: build output, generated sources, and test reports; do not edit manually.
 
-Current `src/main/java` and `src/test/java` directories are scaffolded and ready for new code.
+The codebase is organized as modules (`meshforge`, `meshforge-loader`, `meshforge-demo`), each with standard Maven source roots.
 
 ## Build, Test, and Development Commands
 Use Maven from the repository root:
@@ -24,7 +24,7 @@ Follow standard Java conventions:
 
 - 4-space indentation, UTF-8, one public class per file.
 - `PascalCase` for classes, `camelCase` for methods/fields, `UPPER_SNAKE_CASE` for constants.
-- Keep package names lowercase under `org.meshforge` (for example `org.meshforge.core`).
+- Keep package names lowercase under `org.dynamisengine.meshforge` (for example `org.dynamisengine.meshforge.core`).
 - Name tests as `*Test.java`; name benchmarks as `*Benchmark.java` in `.../bench`.
 
 No formatter/linter plugin is currently configured in `pom.xml`; keep style consistent with surrounding code.
@@ -32,8 +32,8 @@ No formatter/linter plugin is currently configured in `pom.xml`; keep style cons
 ## Testing Guidelines
 JUnit 5 (`junit-jupiter`) is the test framework. Prefer small, deterministic tests and reuse fixtures from `src/test/resources`.
 
-- Place behavior/unit tests under `src/test/java/org/meshforge/.../test`.
-- Keep benchmark code under `src/test/java/org/meshforge/.../bench` (JMH).
+- Place behavior/unit tests under `*/src/test/java/org/dynamisengine/meshforge/.../test`.
+- Keep benchmark code under `*/src/test/java/org/dynamisengine/meshforge/.../bench` (JMH).
 - Run `mvn clean test` before opening a PR.
 
 No coverage gate is configured; aim to cover core algorithms and parsing paths.

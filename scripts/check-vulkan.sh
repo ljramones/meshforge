@@ -54,5 +54,5 @@ fi
 echo
 echo "Preflight passed."
 echo "Run:"
-echo "  mvn -q -pl meshforge-demo -Dexec.mainClass=org.meshforge.demo.MeshletDispatchDemo -Dexec.args=\"fixtures/obj/medium/suzanne.obj\" exec:java"
+echo "  mvn -q -pl meshforge-demo -Dexec.mainClass=org.dynamisengine.meshforge.demo.MeshletDispatchDemo -Dexec.args=\"fixtures/obj/medium/suzanne.obj\" exec:java"
 

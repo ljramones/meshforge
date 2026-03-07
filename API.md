@@ -10,14 +10,14 @@ This document is the top-level API reference for MeshForge v1.
 2. Processing: `MeshPipeline` + `MeshOp`
 3. Packing: immutable `PackedMesh`
 
-## Public Facade (`org.meshforge.api`)
+## Public Facade (`org.dynamisengine.meshforge.api`)
 
 - `Meshes`: mesh creation helpers (`builder`, `writer`, sample primitives)
 - `Ops`: operation factories (`validate`, `weld`, `normals`, `tangents`, `optimizeVertexCache`, etc.)
 - `Pipelines`: opinionated operation chains (`realtime`, `realtimeFast`)
 - `Packers`: pack presets that return `PackSpec`
 
-## Core Authoring (`org.meshforge.core.*`)
+## Core Authoring (`org.dynamisengine.meshforge.core.*`)
 
 - `MeshData`: mutable mesh model with schema, attributes, topology, indices, submeshes, morph targets, optional bounds
 - `VertexSchema`: semantic and format contract for attributes
@@ -26,7 +26,7 @@ This document is the top-level API reference for MeshForge v1.
 - `Submesh`: index-range partition and material binding
 - `Topology`: primitive topology enum
 
-## Ops (`org.meshforge.ops.*`)
+## Ops (`org.dynamisengine.meshforge.ops.*`)
 
 - `MeshOp`: operation interface
 - `MeshPipeline.run(mesh, ops...)`: deterministic left-to-right composition
@@ -39,7 +39,7 @@ Common op families:
 - Degenerate removal and weld/compact
 - Index reorder and meshlet clustering/order
 
-## Packing (`org.meshforge.pack.*`)
+## Packing (`org.dynamisengine.meshforge.pack.*`)
 
 - `PackSpec`: pack contract (layout, index policy, target formats, meshlet options)
 - `MeshPacker.pack(mesh, spec)`: authoring-to-runtime transform
