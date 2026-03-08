@@ -415,6 +415,12 @@ Runtime flow references:
 - `docs/runtime-geometry-cache-lifecycle.md`
 - `docs/meshforge-v1-architecture.md`
 
+v2 planning references:
+
+- `docs/v2-clustered-runtime-contract.md`
+- `docs/v2-clustered-cache-strategy.md`
+- `docs/v2-lod-chunking-outline.md`
+
 ---
 
 # Current Scope (v1)
