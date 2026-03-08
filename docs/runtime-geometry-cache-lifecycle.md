@@ -62,9 +62,10 @@ load(asset):
             rebuild cache from source import path
 ```
 
-Current integration utility:
+Canonical integration utility:
 
-- `RuntimeGeometryCacheLifecycle.loadOrBuild(...)`
+- `RuntimeGeometryLoader.load(...)`
+- `RuntimeGeometryLoader.load(source, forceRebuild)`
 
 ## Writing Policy (Current)
 

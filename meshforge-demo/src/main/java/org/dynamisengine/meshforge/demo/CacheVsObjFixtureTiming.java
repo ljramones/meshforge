@@ -7,6 +7,7 @@ import org.dynamisengine.meshforge.gpu.GpuGeometryUploadPlan;
 import org.dynamisengine.meshforge.gpu.MeshForgeGpuBridge;
 import org.dynamisengine.meshforge.gpu.RuntimeGeometryPayload;
 import org.dynamisengine.meshforge.gpu.cache.RuntimeGeometryCachePolicy;
+import org.dynamisengine.meshforge.gpu.cache.RuntimeGeometryLoader;
 import org.dynamisengine.meshforge.loader.MeshLoaders;
 import org.dynamisengine.meshforge.pack.packer.MeshPacker;
 import org.dynamisengine.meshforge.pack.spec.PackSpec;
@@ -61,6 +62,7 @@ public final class CacheVsObjFixtureTiming {
 
         MeshLoaders loaders = MeshLoaders.defaultsFast();
         PackSpec spec = Packers.realtime();
+        RuntimeGeometryLoader runtimeLoader = new RuntimeGeometryLoader(loaders, spec);
         if (cacheDir != null) {
             Files.createDirectories(cacheDir);
         }
@@ -68,7 +70,7 @@ public final class CacheVsObjFixtureTiming {
         System.out.println("| Fixture | OBJ->prep->pack->bridge ms | Cache load->bridge ms | Speedup | Triangles |");
         System.out.println("|---|---:|---:|---:|---:|");
         for (Path fixture : fixtures) {
-            Row row = measureFixture(loaders, spec, cacheDir, fixture, forceRebuild);
+            Row row = measureFixture(loaders, spec, runtimeLoader, cacheDir, fixture, forceRebuild);
             double speedup = row.objPathMs / row.cachePathMs;
             System.out.printf(
                 Locale.ROOT,
@@ -81,6 +83,7 @@ public final class CacheVsObjFixtureTiming {
     private static Row measureFixture(
         MeshLoaders loaders,
         PackSpec spec,
+        RuntimeGeometryLoader runtimeLoader,
         Path cacheDir,
         Path fixture,
         boolean forceRebuild
@@ -92,7 +95,7 @@ public final class CacheVsObjFixtureTiming {
         MeshData processed = Pipelines.realtimeFast(source);
         int[] idx = processed.indicesOrNull();
         int triangles = idx == null ? 0 : idx.length / 3;
-        RuntimeGeometryCacheLifecycle.loadOrBuild(fixture, cacheFile, loaders, spec, forceRebuild);
+        runtimeLoader.load(fixture, cacheFile, forceRebuild);
 
         double[] objPass = new double[3];
         double[] cachePass = new double[3];
@@ -107,7 +110,7 @@ public final class CacheVsObjFixtureTiming {
                 RuntimeGeometryPayload warmPayload = MeshForgeGpuBridge.payloadFromRuntimeWorkspace(warmPlan.layout(), warmWs);
                 MeshForgeGpuBridge.buildUploadPlan(warmPayload);
                 RuntimeGeometryPayload warmCachePayload =
-                    RuntimeGeometryCacheLifecycle.loadOrBuild(fixture, cacheFile, loaders, spec, false).payload();
+                    runtimeLoader.load(fixture, cacheFile, false).payload();
                 MeshForgeGpuBridge.buildUploadPlan(warmCachePayload);
             }
 
@@ -129,7 +132,7 @@ public final class CacheVsObjFixtureTiming {
 
                 long cacheStart = System.nanoTime();
                 RuntimeGeometryPayload cachePayload =
-                    RuntimeGeometryCacheLifecycle.loadOrBuild(fixture, cacheFile, loaders, spec, false).payload();
+                    runtimeLoader.load(fixture, cacheFile, false).payload();
                 GpuGeometryUploadPlan cacheGpuPlan = MeshForgeGpuBridge.buildUploadPlan(cachePayload);
                 if (cacheGpuPlan.vertexBinding().byteSize() <= 0) {
                     throw new IllegalStateException("Invalid cache-path upload plan");

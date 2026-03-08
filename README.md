@@ -534,6 +534,13 @@ The preferred cold-load runtime path is:
 runtime geometry cache -> RuntimeGeometryPayload -> GpuGeometryUploadPlan
 ```
 
+Canonical loader entry point:
+
+```java
+RuntimeGeometryLoader loader = new RuntimeGeometryLoader(MeshLoaders.defaultsFast(), Packers.realtime());
+RuntimeGeometryLoader.Result result = loader.load(assetPath);
+```
+
 ### Runtime Geometry Pipeline
 
 Slow path (source import):
