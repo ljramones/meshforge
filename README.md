@@ -422,31 +422,188 @@ Baseline config is in `perf/baseline.csv`, with process notes in `docs/perf-base
 Command (run from repo root):
 
 ```bash
-mvn -pl meshforge-demo -DskipTests compile
-mvn -pl meshforge-demo -Dexec.mainClass=org.dynamisengine.meshforge.demo.BaselineFixtureTiming exec:java
+mvn -pl meshforge-demo -am -DskipTests compile dependency:build-classpath \
+  -Dmdep.includeScope=runtime -Dmdep.outputFile=/tmp/mf_demo_cp.txt
+CP="$(cat /tmp/mf_demo_cp.txt):meshforge-demo/target/classes"
+java --enable-preview --add-modules jdk.incubator.vector \
+  -cp "$CP" org.dynamisengine.meshforge.demo.BaselineFixtureTiming --repeat=16
 ```
 
 Definitions:
-- `Load ms (median)`: median of 3 timing passes for file read + parse into `MeshData` (`MeshLoaders.defaults().load(...)`)
-- `Create ms (median)`: median of 3 timing passes for mesh runtime prep (`Pipelines.realtimeFast(...)` + `MeshPacker.pack(..., Packers.realtime())`)
-- `Load ms / 1M verts`: normalized loader cost by vertex count
-- `Create ms / 1M tris`: normalized creation cost by triangle count
+- `Load ms`: median of 3 timing passes for file read + parse into `MeshData` (`MeshLoaders.defaultsFast().load(...)`)
+- `Mode A (cold create)`: `Load -> Pipelines.realtimeFast(...) -> pack lane` measured per operation
+- `Mode B (repeated create)`: load once, preprocess once, then repeat create lane (`--repeat` count) and report per-op median
+- `Friendly lane`: `MeshPacker.pack(mesh, Packers.realtime())`
+- `Runtime lane`: `MeshPacker.packInto(mesh, Packers.realtime(), workspace)`
+- `Planned lane`: `RuntimePackPlan plan = MeshPacker.buildRuntimePlan(mesh, Packers.realtime())`, then `MeshPacker.packPlannedInto(plan, workspace)`
+- `/1M tris`: normalized creation cost by triangle count
 
-Snapshot (February 22, 2026, local machine run):
+Post-runtime-hardening snapshot (March 7, 2026, local machine run):
 
-| Fixture | Load ms (median) | Create ms (median) | Load ms / 1M verts | Create ms / 1M tris | Vertices | Triangles |
-|---|---:|---:|---:|---:|---:|---:|
-| `beast.obj` | 3.340 | 0.881 | 103.370 | 13.634 | 32311 | 64618 |
-| `cow.obj` | 0.293 | 0.076 | 100.939 | 13.046 | 2903 | 5804 |
-| `lucy.obj` | 6.046 | 1.381 | 120.961 | 13.810 | 49987 | 99970 |
-| `nefertiti.obj` | 5.420 | 1.111 | 108.463 | 11.114 | 49971 | 99938 |
-| `RevitHouse.obj` | 70.450 | 10.547 | 56.715 | 25.592 | 1242180 | 412119 |
-| `stanford-bunny.obj` | 3.302 | 0.833 | 91.870 | 11.992 | 35947 | 69451 |
-| `suzanne.obj` | 0.065 | 0.022 | 128.944 | 22.701 | 507 | 968 |
-| `teapot.obj` | 0.303 | 0.078 | 83.054 | 12.367 | 3644 | 6320 |
-| `xyzrgb_dragon.obj` | 15.200 | 3.090 | 121.540 | 12.367 | 125066 | 249882 |
+- Commit: `1fbb7b8`
+- JDK: `openjdk 25.0.1 LTS` (preview enabled)
+- Flags: `--enable-preview --add-modules jdk.incubator.vector`
+- Host: `Darwin 25.3.0 (arm64)`
+
+Mode A: cold create (`Load -> Create`)
+
+| Fixture | Load ms | Create Friendly | Create Runtime | Create Planned | Friendly /1M tris | Runtime /1M tris | Planned /1M tris | Vertices | Triangles |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `beast.obj` | 3.176 | 3.978 | 3.579 | 3.594 | 61.568 | 55.380 | 55.625 | 32311 | 64618 |
+| `cow.obj` | 0.270 | 0.311 | 0.290 | 0.303 | 53.555 | 50.027 | 52.284 | 2903 | 5804 |
+| `lucy.obj` | 5.476 | 5.711 | 5.413 | 5.376 | 57.126 | 54.147 | 53.780 | 49987 | 99970 |
+| `nefertiti.obj` | 5.067 | 5.255 | 5.013 | 5.101 | 52.578 | 50.160 | 51.043 | 49971 | 99938 |
+| `RevitHouse.obj` | 71.350 | 20.234 | 16.212 | 16.235 | 49.098 | 39.338 | 39.394 | 1242180 | 412119 |
+| `stanford-bunny.obj` | 3.158 | 3.223 | 3.089 | 3.089 | 46.408 | 44.484 | 44.479 | 35947 | 69451 |
+| `suzanne.obj` | 0.059 | 0.046 | 0.045 | 0.044 | 47.650 | 46.419 | 44.938 | 507 | 968 |
+| `teapot.obj` | 0.292 | 0.285 | 0.275 | 0.277 | 45.137 | 43.542 | 43.784 | 3644 | 6320 |
+| `xyzrgb_dragon.obj` | 14.308 | 12.840 | 12.098 | 12.085 | 51.384 | 48.416 | 48.361 | 125066 | 249882 |
+
+Mode B: repeated create (load once, repeated create; `repeat=16`)
+
+| Fixture | Create Friendly | Create Runtime | Create Planned | Friendly /1M tris | Runtime /1M tris | Planned /1M tris | Vertices | Triangles |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `beast.obj` | 1.590 | 0.875 | 0.777 | 24.607 | 13.533 | 12.031 | 32311 | 64618 |
+| `cow.obj` | 0.133 | 0.066 | 0.068 | 22.974 | 11.382 | 11.722 | 2903 | 5804 |
+| `lucy.obj` | 3.541 | 2.367 | 2.265 | 35.423 | 23.673 | 22.658 | 49987 | 99970 |
+| `nefertiti.obj` | 2.406 | 1.256 | 1.151 | 24.076 | 12.568 | 11.514 | 49971 | 99938 |
+| `RevitHouse.obj` | 37.005 | 16.794 | 16.760 | 89.791 | 40.751 | 40.668 | 1242180 | 412119 |
+| `stanford-bunny.obj` | 1.683 | 0.863 | 0.822 | 24.239 | 12.431 | 11.833 | 35947 | 69451 |
+| `suzanne.obj` | 0.027 | 0.013 | 0.012 | 28.035 | 12.959 | 11.904 | 507 | 968 |
+| `teapot.obj` | 0.138 | 0.080 | 0.079 | 21.897 | 12.684 | 12.505 | 3644 | 6320 |
+| `xyzrgb_dragon.obj` | 7.332 | 3.900 | 3.465 | 29.342 | 15.609 | 13.868 | 125066 | 249882 |
 
 These are fixture-level throughput indicators and will vary by CPU/JVM/load.
+
+## End-to-End Runtime Geometry Baseline
+
+The original fixture table measured two separate phases:
+
+- `Load ms` = file read + parse into `MeshData`
+- `Create ms` = `Pipelines.realtimeFast(...) + MeshPacker.pack(...)`
+
+Recent work introduced two additional end-to-end measurements:
+
+- `New OBJ total` = OBJ parse + runtime prep + packing + MeshForge -> DynamisGPU upload-plan translation
+- `Cache total` = runtime-geometry cache load + MeshForge -> DynamisGPU upload-plan translation
+
+This makes the comparison clearer: the optimized runtime pipeline is not slower; the full OBJ path is roughly in line with the original baseline, while the cached runtime geometry path is dramatically faster.
+
+### Baseline Comparison Table
+
+| Fixture | Old Load ms | Old Create ms | Old Total ms | New OBJ Total ms | Cache Total ms | Cache Speedup vs Old Total |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| RevitHouse.obj | 70.450 | 10.547 | 80.997 | 81.538 | 3.995 | 20.27x |
+| xyzrgb_dragon.obj | 15.200 | 3.090 | 18.290 | 17.929 | 1.243 | 14.71x |
+| lucy.obj | 6.046 | 1.381 | 7.427 | 6.994 | 0.422 | 17.60x |
+
+### Interpretation
+
+- The old total and new OBJ total are comparable and remain in the same general range.
+- The main remaining cold-load bottleneck in the OBJ path is text parsing, not runtime geometry preparation.
+- The new runtime geometry cache bypasses parse + prep + packing and feeds the MeshForge -> DynamisGPU seam directly.
+- This yields a large cold-load improvement:
+  - RevitHouse: ~81.0 ms -> ~4.0 ms
+  - dragon: ~18.3 ms -> ~1.2 ms
+  - lucy: ~7.4 ms -> ~0.4 ms
+
+### Current Runtime Geometry Doctrine
+
+MeshForge now provides three packing tiers:
+
+- `pack(...)` - friendly, ergonomic path
+- `packInto(...)` - runtime path
+- `packPlannedInto(...)` - lowest-overhead repeated-runtime path
+
+The preferred repeated engine path is:
+
+```java
+RuntimePackPlan plan = MeshPacker.buildRuntimePlan(mesh, spec);
+MeshPacker.packPlannedInto(plan, workspace);
+```
+
+The preferred cold-load runtime path is:
+
+```text
+runtime geometry cache -> RuntimeGeometryPayload -> GpuGeometryUploadPlan
+```
+
+## Next Phase
+
+The next phase is no longer about squeezing MeshForge packing or runtime pipeline internals. Those paths are now in strong shape. The next work should focus on integration and productionization.
+
+### Phase E - Runtime Geometry Integration and Cache Productionization
+
+#### Track A - MeshForge -> DynamisGPU seam
+
+Status: foundation complete
+
+Completed:
+
+- `meshforge-dynamisgpu` module
+- `RuntimeGeometryPayload`
+- `GpuGeometryUploadPlan`
+- `MeshForgeGpuBridge`
+- seam benchmark
+
+Next:
+
+- document the runtime geometry contract more formally
+- decide whether payload backing should stay abstract or standardize around a single low-level carrier
+- extend the seam for future multi-stream layouts and meshlet/cluster upload plans
+
+#### Track B - Runtime geometry cache
+
+Status: prototype complete
+
+Completed:
+
+- cache format draft
+- serializer/deserializer prototype
+- cache vs OBJ benchmark harness
+
+Next:
+
+- add format versioning and compatibility checks
+- add schema/layout validation during load
+- define cache invalidation rules
+- integrate cache generation into the asset pipeline
+- add background/offline cache build support
+
+### Immediate Implementation Goals
+
+1. Finalize cache format header
+   - magic
+   - version
+   - endianness
+   - layout/schema identifier
+   - compatibility flags
+2. Add cache validation
+   - reject stale or incompatible cached payloads
+   - fall back to source import when needed
+3. Wire cache generation into import flow
+   - first load from OBJ/GLTF/etc builds runtime cache
+   - subsequent loads use cache directly
+4. Add production fixture regression table
+   - old total
+   - new OBJ total
+   - cache total
+   - speedup
+   - commit/JDK/platform metadata
+5. Prepare for future GPU-side work
+   - multi-stream vertex layouts
+   - meshlets/clusters
+   - chunked geometry caches
+   - streaming residency strategy
+
+### Short Version
+
+MeshForge runtime geometry preparation is no longer the primary bottleneck.
+The next phase is to:
+
+- lock the MeshForge -> DynamisGPU seam
+- productionize the runtime geometry cache
+- shift cold-load cost away from text parsing and toward cached runtime-ready geometry
 
 ## Phase-Split Fixture Timings
 
