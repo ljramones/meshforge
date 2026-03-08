@@ -338,6 +338,24 @@ public final class MeshPacker {
             this.indexPolicy = indexPolicy;
             this.submeshes = submeshes;
         }
+
+        /**
+         * Returns the packed vertex layout for this plan.
+         *
+         * @return vertex layout
+         */
+        public VertexLayout layout() {
+            return layout;
+        }
+
+        /**
+         * Returns vertex count for this plan.
+         *
+         * @return vertex count
+         */
+        public int vertexCount() {
+            return vertexCount;
+        }
     }
 
     /**
