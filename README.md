@@ -425,14 +425,10 @@ Baseline config is in `perf/baseline.csv`, with process notes in `docs/perf-base
 
 # Fixture Baseline Timings
 
-Command (run from repo root):
+The historical fixture timing harness is kept in tooling at:
 
 ```bash
-mvn -pl meshforge-demo -am -DskipTests compile dependency:build-classpath \
-  -Dmdep.includeScope=runtime -Dmdep.outputFile=/tmp/mf_demo_cp.txt
-CP="$(cat /tmp/mf_demo_cp.txt):meshforge-demo/target/classes"
-java --enable-preview --add-modules jdk.incubator.vector \
-  -cp "$CP" org.dynamisengine.meshforge.demo.BaselineFixtureTiming --repeat=16
+tools/benchmarks/meshforge/BaselineFixtureTiming.java
 ```
 
 Definitions:
