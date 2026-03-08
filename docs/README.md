@@ -23,6 +23,7 @@ Last updated: 2026-02-23
 
 - `docs/loader-roadmap.md` - implemented vs placeholder loader formats
 - `docs/mesh-fixtures.md` - fixture sources and repository layout
+- `docs/runtime-geometry-cache-lifecycle.md` - `.mfgc` placement, validation, and rebuild policy
 - `docs/stress-guarantees.md` - stress/fuzz guardrails and failure contract
 
 ## Planning / History

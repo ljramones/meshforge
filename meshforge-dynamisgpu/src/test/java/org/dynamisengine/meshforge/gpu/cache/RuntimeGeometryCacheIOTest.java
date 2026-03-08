@@ -53,6 +53,38 @@ final class RuntimeGeometryCacheIOTest {
     }
 
     @Test
+    void rejectsUnsupportedFlags() throws Exception {
+        MeshData mesh = Meshes.cube(1.0f);
+        PackedMesh packed = MeshPacker.pack(mesh, Packers.realtime());
+        RuntimeGeometryPayload payload = MeshForgeGpuBridge.payloadFromPackedMesh(packed);
+        Path tmp = Files.createTempFile("meshforge-runtime-geo-flags-", ".mfgc");
+        RuntimeGeometryCacheIO.write(tmp, payload);
+
+        try (RandomAccessFile raf = new RandomAccessFile(tmp.toFile(), "rw")) {
+            raf.seek(9); // flags field (magic[4] + version[4] + endian[1])
+            raf.writeInt(0x40);
+        }
+
+        assertThrows(IOException.class, () -> RuntimeGeometryCacheIO.read(tmp));
+    }
+
+    @Test
+    void rejectsLayoutHashMismatch() throws Exception {
+        MeshData mesh = Meshes.cube(1.0f);
+        PackedMesh packed = MeshPacker.pack(mesh, Packers.realtime());
+        RuntimeGeometryPayload payload = MeshForgeGpuBridge.payloadFromPackedMesh(packed);
+        Path tmp = Files.createTempFile("meshforge-runtime-geo-lhash-", ".mfgc");
+        RuntimeGeometryCacheIO.write(tmp, payload);
+
+        try (RandomAccessFile raf = new RandomAccessFile(tmp.toFile(), "rw")) {
+            raf.seek(13); // layoutHash starts after magic/version/endian/flags
+            raf.writeLong(0xDEADBEEFL);
+        }
+
+        assertThrows(IOException.class, () -> RuntimeGeometryCacheIO.read(tmp));
+    }
+
+    @Test
     void rejectsTruncatedPayload() throws Exception {
         MeshData mesh = Meshes.cube(1.0f);
         PackedMesh packed = MeshPacker.pack(mesh, Packers.realtime());

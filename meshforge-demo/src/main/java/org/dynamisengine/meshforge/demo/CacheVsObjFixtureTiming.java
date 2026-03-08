@@ -6,6 +6,7 @@ import org.dynamisengine.meshforge.core.mesh.MeshData;
 import org.dynamisengine.meshforge.gpu.GpuGeometryUploadPlan;
 import org.dynamisengine.meshforge.gpu.MeshForgeGpuBridge;
 import org.dynamisengine.meshforge.gpu.RuntimeGeometryPayload;
+import org.dynamisengine.meshforge.gpu.cache.RuntimeGeometryCachePolicy;
 import org.dynamisengine.meshforge.loader.MeshLoaders;
 import org.dynamisengine.meshforge.pack.packer.MeshPacker;
 import org.dynamisengine.meshforge.pack.spec.PackSpec;
@@ -30,11 +31,14 @@ public final class CacheVsObjFixtureTiming {
     public static void main(String[] args) throws Exception {
         String fixtureFilter = null;
         boolean forceRebuild = false;
+        Path cacheDir = null;
         for (String arg : args) {
             if (arg.startsWith("--fixture=")) {
                 fixtureFilter = arg.substring("--fixture=".length()).trim().toLowerCase(Locale.ROOT);
             } else if ("--force-rebuild".equals(arg)) {
                 forceRebuild = true;
+            } else if (arg.startsWith("--cache-dir=")) {
+                cacheDir = Path.of(arg.substring("--cache-dir=".length()).trim());
             }
         }
 
@@ -57,8 +61,9 @@ public final class CacheVsObjFixtureTiming {
 
         MeshLoaders loaders = MeshLoaders.defaultsFast();
         PackSpec spec = Packers.realtime();
-        Path cacheDir = Path.of("perf", "cache");
-        Files.createDirectories(cacheDir);
+        if (cacheDir != null) {
+            Files.createDirectories(cacheDir);
+        }
 
         System.out.println("| Fixture | OBJ->prep->pack->bridge ms | Cache load->bridge ms | Speedup | Triangles |");
         System.out.println("|---|---:|---:|---:|---:|");
@@ -80,7 +85,9 @@ public final class CacheVsObjFixtureTiming {
         Path fixture,
         boolean forceRebuild
     ) throws Exception {
-        Path cacheFile = cacheDir.resolve(fixture.getFileName().toString() + ".mfgc");
+        Path cacheFile = cacheDir == null
+            ? RuntimeGeometryCachePolicy.sidecarPathFor(fixture)
+            : cacheDir.resolve(fixture.getFileName().toString() + ".mfgc");
         MeshData source = loaders.load(fixture);
         MeshData processed = Pipelines.realtimeFast(source);
         int[] idx = processed.indicesOrNull();

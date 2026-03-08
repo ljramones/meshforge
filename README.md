@@ -576,6 +576,12 @@ Regression guardrail snapshot:
 docs/runtime-geometry-regression-baseline.md
 ```
 
+Cache lifecycle policy:
+
+```text
+docs/runtime-geometry-cache-lifecycle.md
+```
+
 ## Next Phase
 
 The next phase is no longer about squeezing MeshForge packing or runtime pipeline internals. Those paths are now in strong shape. The next work should focus on integration and productionization.
