@@ -66,6 +66,7 @@ Canonical integration utility:
 
 - `RuntimeGeometryLoader.load(...)`
 - `RuntimeGeometryLoader.load(source, forceRebuild)`
+- `RuntimeGeometryLoader.prebuild(...)`
 
 ## Writing Policy (Current)
 

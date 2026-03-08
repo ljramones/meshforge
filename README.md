@@ -539,6 +539,7 @@ Canonical loader entry point:
 ```java
 RuntimeGeometryLoader loader = new RuntimeGeometryLoader(MeshLoaders.defaultsFast(), Packers.realtime());
 RuntimeGeometryLoader.Result result = loader.load(assetPath);
+RuntimeGeometryLoader.PrebuildResult warmed = loader.prebuild(assetPath);
 ```
 
 ### Runtime Geometry Pipeline

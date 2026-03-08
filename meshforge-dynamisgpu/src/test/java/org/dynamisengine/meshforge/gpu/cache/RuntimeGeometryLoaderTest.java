@@ -52,6 +52,31 @@ final class RuntimeGeometryLoaderTest {
         assertEquals(RuntimeGeometryLoader.Source.REBUILT, forced.source());
     }
 
+    @Test
+    void prebuildCreatesThenReusesCache(@TempDir Path dir) throws Exception {
+        Path source = writeMinimalObj(dir.resolve("triangle.obj"));
+        RuntimeGeometryLoader loader = new RuntimeGeometryLoader(MeshLoaders.defaultsFast(), Packers.realtimeFast());
+
+        RuntimeGeometryLoader.PrebuildResult first = loader.prebuild(source);
+        RuntimeGeometryLoader.PrebuildResult second = loader.prebuild(source);
+
+        assertEquals(RuntimeGeometryLoader.PrebuildStatus.BUILT, first.status());
+        assertEquals(RuntimeGeometryLoader.PrebuildStatus.REUSED, second.status());
+        assertTrue(Files.isRegularFile(first.cacheFile()));
+    }
+
+    @Test
+    void prebuildRebuildsWhenSourceIsNewer(@TempDir Path dir) throws Exception {
+        Path source = writeMinimalObj(dir.resolve("triangle.obj"));
+        RuntimeGeometryLoader loader = new RuntimeGeometryLoader(MeshLoaders.defaultsFast(), Packers.realtimeFast());
+
+        loader.prebuild(source);
+        Files.setLastModifiedTime(source, FileTime.from(Instant.now().plusSeconds(2)));
+        RuntimeGeometryLoader.PrebuildResult refreshed = loader.prebuild(source);
+
+        assertEquals(RuntimeGeometryLoader.PrebuildStatus.BUILT, refreshed.status());
+    }
+
     private static Path writeMinimalObj(Path path) throws IOException {
         String data = """
             v 0 0 0

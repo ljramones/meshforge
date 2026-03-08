@@ -30,10 +30,23 @@ public final class RuntimeGeometryLoader {
         REBUILT
     }
 
+    public enum PrebuildStatus {
+        REUSED,
+        BUILT
+    }
+
     public record Result(RuntimeGeometryPayload payload, Source source) {
         public Result {
             Objects.requireNonNull(payload, "payload");
             Objects.requireNonNull(source, "source");
+        }
+    }
+
+    public record PrebuildResult(Path sourceMesh, Path cacheFile, PrebuildStatus status) {
+        public PrebuildResult {
+            Objects.requireNonNull(sourceMesh, "sourceMesh");
+            Objects.requireNonNull(cacheFile, "cacheFile");
+            Objects.requireNonNull(status, "status");
         }
     }
 
@@ -46,13 +59,32 @@ public final class RuntimeGeometryLoader {
     }
 
     public Result load(Path sourceMesh, Path cacheFile, boolean forceRebuild) throws IOException {
+        Prepared prepared = preparePayload(sourceMesh, cacheFile, forceRebuild);
+        return new Result(prepared.payload(), prepared.source());
+    }
+
+    public PrebuildResult prebuild(Path sourceMesh) throws IOException {
+        return prebuild(sourceMesh, false);
+    }
+
+    public PrebuildResult prebuild(Path sourceMesh, boolean forceRebuild) throws IOException {
+        return prebuild(sourceMesh, RuntimeGeometryCachePolicy.sidecarPathFor(sourceMesh), forceRebuild);
+    }
+
+    public PrebuildResult prebuild(Path sourceMesh, Path cacheFile, boolean forceRebuild) throws IOException {
+        Prepared prepared = preparePayload(sourceMesh, cacheFile, forceRebuild);
+        PrebuildStatus status = prepared.source() == Source.CACHE ? PrebuildStatus.REUSED : PrebuildStatus.BUILT;
+        return new PrebuildResult(sourceMesh, cacheFile, status);
+    }
+
+    private Prepared preparePayload(Path sourceMesh, Path cacheFile, boolean forceRebuild) throws IOException {
         if (!Files.isRegularFile(sourceMesh)) {
             throw new IOException("Missing source mesh: " + sourceMesh.toAbsolutePath());
         }
 
         if (!RuntimeGeometryCachePolicy.shouldRebuild(sourceMesh, cacheFile, forceRebuild)) {
             try {
-                return new Result(RuntimeGeometryCacheIO.read(cacheFile), Source.CACHE);
+                return new Prepared(RuntimeGeometryCacheIO.read(cacheFile), Source.CACHE);
             } catch (IOException ignored) {
                 // Fall through to rebuild on incompatible/truncated/corrupt cache.
             }
@@ -65,6 +97,9 @@ public final class RuntimeGeometryLoader {
         MeshPacker.packPlannedInto(plan, workspace);
         RuntimeGeometryPayload payload = MeshForgeGpuBridge.payloadFromRuntimeWorkspace(plan.layout(), workspace);
         RuntimeGeometryCacheIO.write(cacheFile, payload);
-        return new Result(payload, Source.REBUILT);
+        return new Prepared(payload, Source.REBUILT);
+    }
+
+    private record Prepared(RuntimeGeometryPayload payload, Source source) {
     }
 }
