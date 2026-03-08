@@ -36,10 +36,14 @@ public final class RemoveDegeneratesOp implements MeshOp {
         int posComps = position == null ? 0 : position.format().components();
 
         int triCount = indices.length / 3;
-        int[] out = new int[indices.length];
-        int write = 0;
         List<Submesh> originalSubmeshes = mesh.submeshes();
         boolean preserveSubmeshes = !originalSubmeshes.isEmpty();
+        if (isAlreadyClean(indices, triCount, pos, posComps)) {
+            return mesh;
+        }
+
+        int[] out = new int[indices.length];
+        int write = 0;
         List<Submesh> remappedSubmeshes = preserveSubmeshes ? new ArrayList<>(originalSubmeshes.size()) : List.of();
 
         if (preserveSubmeshes) {
@@ -99,6 +103,21 @@ public final class RemoveDegeneratesOp implements MeshOp {
             }
         }
         return mesh;
+    }
+
+    private static boolean isAlreadyClean(int[] indices, int triCount, float[] pos, int posComps) {
+        for (int t = 0; t < triCount; t++) {
+            int a = indices[t * 3];
+            int b = indices[t * 3 + 1];
+            int c = indices[t * 3 + 2];
+            if (a == b || b == c || a == c) {
+                return false;
+            }
+            if (pos != null && posComps >= 3 && isZeroArea(a, b, c, pos, posComps)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean isZeroArea(int ia, int ib, int ic, float[] pos, int comps) {

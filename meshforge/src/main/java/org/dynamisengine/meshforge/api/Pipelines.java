@@ -62,7 +62,8 @@ public final class Pipelines {
         ops.add(Ops.validate());
         ops.add(Ops.removeDegenerates());
         if (!mesh.has(AttributeSemantic.NORMAL, 0)) {
-            ops.add(Ops.normals(60f));
+            // Runtime-focused fast path: use smooth normals without threshold adjacency build.
+            ops.add(Ops.normals(180f));
         }
         if (mesh.has(AttributeSemantic.UV, 0) && !mesh.has(AttributeSemantic.TANGENT, 0)) {
             ops.add(Ops.tangents());
@@ -71,4 +72,3 @@ public final class Pipelines {
         return ops.toArray(MeshOp[]::new);
     }
 }
-
