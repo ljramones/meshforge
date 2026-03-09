@@ -86,10 +86,9 @@ public record GpuMeshletVisibilityPayload(
      */
     public ByteBuffer toBoundsByteBuffer() {
         ByteBuffer out = ByteBuffer.allocateDirect(boundsByteSize()).order(ByteOrder.LITTLE_ENDIAN);
-        for (float value : boundsPayload) {
-            out.putFloat(value);
-        }
-        out.flip();
+        out.asFloatBuffer().put(boundsPayload);
+        out.position(0);
+        out.limit(boundsByteSize());
         return out;
     }
 

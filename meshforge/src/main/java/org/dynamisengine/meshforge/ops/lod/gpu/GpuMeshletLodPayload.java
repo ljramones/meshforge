@@ -72,10 +72,9 @@ public record GpuMeshletLodPayload(
 
     public ByteBuffer toLevelsByteBuffer() {
         ByteBuffer out = ByteBuffer.allocateDirect(levelsByteSize()).order(ByteOrder.LITTLE_ENDIAN);
-        for (int value : levelsPayload) {
-            out.putInt(value);
-        }
-        out.flip();
+        out.asIntBuffer().put(levelsPayload);
+        out.position(0);
+        out.limit(levelsByteSize());
         return out;
     }
 

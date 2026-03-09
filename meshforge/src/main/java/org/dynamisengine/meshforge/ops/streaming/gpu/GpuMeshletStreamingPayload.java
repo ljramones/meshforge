@@ -73,10 +73,9 @@ public record GpuMeshletStreamingPayload(
 
     public ByteBuffer toUnitsByteBuffer() {
         ByteBuffer out = ByteBuffer.allocateDirect(unitsByteSize()).order(ByteOrder.LITTLE_ENDIAN);
-        for (int value : unitsPayload) {
-            out.putInt(value);
-        }
-        out.flip();
+        out.asIntBuffer().put(unitsPayload);
+        out.position(0);
+        out.limit(unitsByteSize());
         return out;
     }
 
