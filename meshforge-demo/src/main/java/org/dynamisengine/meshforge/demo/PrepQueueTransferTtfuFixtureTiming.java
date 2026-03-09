@@ -93,6 +93,9 @@ public final class PrepQueueTransferTtfuFixtureTiming {
             if (mode.includesMgiFull()) {
                 rows.add(measureFixture(loaders, spec, fixture, warmup, runs, maxInflight, Mode.MGI_FULL));
             }
+            if (mode.includesMgiTrustedFast()) {
+                rows.add(measureFixture(loaders, spec, fixture, warmup, runs, maxInflight, Mode.MGI_TRUSTED_FAST));
+            }
             if (mode.includesRuntimeOnly()) {
                 rows.add(measureFixture(loaders, spec, fixture, warmup, runs, maxInflight, Mode.RUNTIME_ONLY));
             }
@@ -101,14 +104,15 @@ public final class PrepQueueTransferTtfuFixtureTiming {
         System.out.println("prep+queue+transfer timing (median + p95)");
         System.out.printf(Locale.ROOT, "warmup=%d runs=%d maxInflight=%d mode=%s%n", warmup, runs, maxInflight, mode.label);
         System.out.println();
-        System.out.println("| Fixture | Mode | Load/Clone ms | Pipeline ms | Pipeline Attr ms | Topology Validate ms | Topology Degenerates ms | Topology Bounds ms | Pipeline Topology ms | Plan ms | Pack ms | Pack Vertex ms | Pack Index ms | Pack Submesh ms | Bridge ms | Queue ms | Transfer ms | Total TTFU ms | Triangles | Upload Bytes |");
-        System.out.println("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+        System.out.println("| Fixture | Mode | Trusted Fast Used | Load/Clone ms | Pipeline ms | Pipeline Attr ms | Topology Validate ms | Topology Degenerates ms | Topology Bounds ms | Pipeline Topology ms | Plan ms | Pack ms | Pack Vertex ms | Pack Index ms | Pack Submesh ms | Bridge ms | Queue ms | Transfer ms | Total TTFU ms | Triangles | Upload Bytes |");
+        System.out.println("|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
         for (Row row : rows) {
             System.out.printf(
                 Locale.ROOT,
-                "| `%s` | %s | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %d | %d |%n",
+                "| `%s` | %s | %s | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %d | %d |%n",
                 row.name,
                 row.mode,
+                row.trustedFastPathUsed ? "yes" : "no",
                 row.loadOrCloneMedianMs,
                 row.pipelineMedianMs,
                 row.pipelineAttrMedianMs,
@@ -186,6 +190,7 @@ public final class PrepQueueTransferTtfuFixtureTiming {
         List<Long> queueNs = new ArrayList<>(runs);
         List<Long> transferNs = new ArrayList<>(runs);
         List<Long> totalNs = new ArrayList<>(runs);
+        int trustedFastPathUses = 0;
 
         int triangles = 0;
         int uploadBytes = 0;
@@ -195,9 +200,9 @@ public final class PrepQueueTransferTtfuFixtureTiming {
         MgiMeshDataCodec mgiCodec = null;
         if (mode == Mode.RUNTIME_ONLY) {
             baseline = loaders.load(fixture);
-        } else if (mode == Mode.MGI_FULL) {
+        } else if (mode == Mode.MGI_FULL || mode == Mode.MGI_TRUSTED_FAST) {
             mgiCodec = new MgiMeshDataCodec();
-            mgiFixture = ensureMgiFixture(loaders, mgiCodec, fixture);
+            mgiFixture = ensureMgiFixture(loaders, mgiCodec, fixture, mode == Mode.MGI_TRUSTED_FAST);
         }
 
         try (AsyncUploadSimulator uploader = new AsyncUploadSimulator(maxInflight)) {
@@ -205,17 +210,33 @@ public final class PrepQueueTransferTtfuFixtureTiming {
                 long t0 = System.nanoTime();
 
                 MeshData loaded;
+                MgiMeshDataCodec.RuntimeDecodeResult runtimeDecoded = null;
                 if (mode == Mode.FULL) {
                     loaded = loaders.load(fixture);
                 } else if (mode == Mode.MGI_FULL) {
                     loaded = mgiCodec.read(Files.readAllBytes(mgiFixture));
+                } else if (mode == Mode.MGI_TRUSTED_FAST) {
+                    runtimeDecoded = mgiCodec.readForRuntime(Files.readAllBytes(mgiFixture));
+                    loaded = runtimeDecoded.meshData();
                 } else {
                     loaded = copyOf(baseline);
                 }
                 long tLoadOrClone = System.nanoTime();
 
                 Pipelines.RuntimeStageProfile pipelineProfile = new Pipelines.RuntimeStageProfile();
-                MeshData processed = Pipelines.realtimeFastProfiled(loaded, pipelineProfile);
+                MeshData processed;
+                if (mode == Mode.MGI_TRUSTED_FAST && runtimeDecoded != null) {
+                    processed = Pipelines.realtimeFastProfiled(
+                        loaded,
+                        pipelineProfile,
+                        true,
+                        runtimeDecoded.trustedCanonical(),
+                        runtimeDecoded.degenerateFree(),
+                        runtimeDecoded.hasPrebakedBounds()
+                    );
+                } else {
+                    processed = Pipelines.realtimeFastProfiled(loaded, pipelineProfile);
+                }
                 long tPipeline = System.nanoTime();
 
                 MeshPacker.RuntimePackPlan runtimePlan = MeshPacker.buildRuntimePlan(processed, spec);
@@ -253,6 +274,9 @@ public final class PrepQueueTransferTtfuFixtureTiming {
                     queueNs.add(timing.queueWaitNanos());
                     transferNs.add(timing.transferNanos());
                     totalNs.add(timing.totalTtfuNanos());
+                    if (pipelineProfile.trustedFastPathUsed()) {
+                        trustedFastPathUses++;
+                    }
                 }
 
                 if (triangles == 0) {
@@ -268,6 +292,7 @@ public final class PrepQueueTransferTtfuFixtureTiming {
         return new Row(
             fixture.getFileName().toString(),
             mode.label,
+            trustedFastPathUses >= (runs / 2),
             toMs(median(loadOrCloneNs)),
             toMs(p95(loadOrCloneNs)),
             toMs(median(pipelineNs)),
@@ -397,30 +422,40 @@ public final class PrepQueueTransferTtfuFixtureTiming {
         return switch (raw.trim().toLowerCase(Locale.ROOT)) {
             case "full" -> Mode.FULL;
             case "mgi-full" -> Mode.MGI_FULL;
+            case "mgi-trusted-fast", "mgi-trusted" -> Mode.MGI_TRUSTED_FAST;
             case "runtime-only" -> Mode.RUNTIME_ONLY;
             case "both" -> Mode.BOTH;
             case "all" -> Mode.ALL;
-            default -> throw new IllegalArgumentException("--mode must be full|mgi-full|runtime-only|both|all");
+            default -> throw new IllegalArgumentException(
+                "--mode must be full|mgi-full|mgi-trusted-fast|runtime-only|both|all");
         };
     }
 
-    private static Path ensureMgiFixture(MeshLoaders loaders, MgiMeshDataCodec codec, Path sourceObj) throws Exception {
-        Path mgi = mgiPathFor(sourceObj);
+    private static Path ensureMgiFixture(
+        MeshLoaders loaders,
+        MgiMeshDataCodec codec,
+        Path sourceObj,
+        boolean trusted
+    ) throws Exception {
+        Path mgi = mgiPathFor(sourceObj, trusted);
         if (Files.isRegularFile(mgi)) {
             return mgi;
         }
 
         MeshData loaded = loaders.load(sourceObj);
+        if (trusted) {
+            loaded = Pipelines.realtimeFast(loaded);
+        }
         byte[] bytes = codec.write(loaded);
         Files.write(mgi, bytes);
         return mgi;
     }
 
-    private static Path mgiPathFor(Path sourceObj) {
+    private static Path mgiPathFor(Path sourceObj, boolean trusted) {
         String file = sourceObj.getFileName().toString();
         int dot = file.lastIndexOf('.');
         String base = dot <= 0 ? file : file.substring(0, dot);
-        return sourceObj.resolveSibling(base + ".mgi");
+        return sourceObj.resolveSibling(base + (trusted ? ".trusted.mgi" : ".mgi"));
     }
 
     private record PendingTransfer(long t0, long t1, long t2, CompletableFuture<Integer> transferFuture) {
@@ -437,6 +472,7 @@ public final class PrepQueueTransferTtfuFixtureTiming {
     private record Row(
         String name,
         String mode,
+        boolean trustedFastPathUsed,
         double loadOrCloneMedianMs,
         double loadOrCloneP95Ms,
         double pipelineMedianMs,
@@ -477,6 +513,7 @@ public final class PrepQueueTransferTtfuFixtureTiming {
     private enum Mode {
         FULL("full"),
         MGI_FULL("mgi-full"),
+        MGI_TRUSTED_FAST("mgi-trusted-fast"),
         RUNTIME_ONLY("runtime-only"),
         BOTH("both"),
         ALL("all");
@@ -493,6 +530,10 @@ public final class PrepQueueTransferTtfuFixtureTiming {
 
         private boolean includesMgiFull() {
             return this == MGI_FULL || this == ALL;
+        }
+
+        private boolean includesMgiTrustedFast() {
+            return this == MGI_TRUSTED_FAST || this == ALL;
         }
 
         private boolean includesRuntimeOnly() {
