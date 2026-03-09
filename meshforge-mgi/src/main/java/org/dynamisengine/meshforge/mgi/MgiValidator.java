@@ -24,9 +24,23 @@ public final class MgiValidator {
         if (header.chunkCount() != chunks.size()) {
             throw new MgiValidationException("chunkCount/header mismatch");
         }
+        if (!header.version().isCompatibleWith(MgiConstants.MIN_SUPPORTED_VERSION, MgiConstants.MAX_SUPPORTED_VERSION)) {
+            throw new MgiValidationException(
+                "unsupported version: " + header.version().major() + "." + header.version().minor()
+            );
+        }
+        if ((header.flags() & MgiConstants.FLAG_LITTLE_ENDIAN) == 0) {
+            throw new MgiValidationException("missing little-endian flag");
+        }
+        if (header.chunkDirectoryOffsetBytes() < MgiConstants.HEADER_SIZE_BYTES) {
+            throw new MgiValidationException("chunk directory offset before header end");
+        }
 
         long directorySize = (long) chunks.size() * MgiConstants.CHUNK_ENTRY_SIZE_BYTES;
         long directoryEnd = header.chunkDirectoryOffsetBytes() + directorySize;
+        if (directoryEnd < header.chunkDirectoryOffsetBytes()) {
+            throw new MgiValidationException("chunk directory offset overflow");
+        }
         if (directoryEnd > fileSizeBytes) {
             throw new MgiValidationException("chunk directory exceeds file bounds");
         }
@@ -35,7 +49,7 @@ public final class MgiValidator {
         List<MgiChunkEntry> sorted = new ArrayList<>(chunks);
         sorted.sort((a, b) -> Long.compare(a.offsetBytes(), b.offsetBytes()));
 
-        long prevEnd = 0L;
+        long prevEnd = directoryEnd;
         for (MgiChunkEntry entry : sorted) {
             if (entry.endExclusive() < entry.offsetBytes()) {
                 throw new MgiValidationException("chunk overflow detected");
@@ -49,10 +63,8 @@ public final class MgiValidator {
             prevEnd = entry.endExclusive();
 
             MgiChunkType known = MgiChunkType.fromId(entry.type());
-            if (known != null) {
-                if (!seenKnown.add(known)) {
-                    throw new MgiValidationException("duplicate known chunk type: " + known);
-                }
+            if (known != null && !seenKnown.add(known)) {
+                throw new MgiValidationException("duplicate known chunk type: " + known);
             }
         }
 

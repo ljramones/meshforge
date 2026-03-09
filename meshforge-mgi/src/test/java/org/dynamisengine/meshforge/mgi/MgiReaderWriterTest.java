@@ -2,8 +2,6 @@ package org.dynamisengine.meshforge.mgi;
 
 import org.junit.jupiter.api.Test;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -11,26 +9,26 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class MgiReaderWriterTest {
 
     @Test
-    void roundTripsHeaderAndChunkDirectory() throws Exception {
-        MgiHeader header = MgiHeader.v1(2, MgiConstants.HEADER_SIZE_BYTES, 1);
+    void roundTripsHeaderAndChunkDirectoryViaFileModel() throws Exception {
+        long payloadStart = MgiConstants.HEADER_SIZE_BYTES + (5L * MgiConstants.CHUNK_ENTRY_SIZE_BYTES);
         List<MgiChunkEntry> chunks = List.of(
-            new MgiChunkEntry(MgiChunkType.MESH_TABLE.id(), 128, 64, 0),
-            new MgiChunkEntry(MgiChunkType.ATTRIBUTE_SCHEMA.id(), 192, 32, 0)
+            new MgiChunkEntry(MgiChunkType.MESH_TABLE.id(), payloadStart, 0, 0),
+            new MgiChunkEntry(MgiChunkType.ATTRIBUTE_SCHEMA.id(), payloadStart, 0, 0),
+            new MgiChunkEntry(MgiChunkType.VERTEX_STREAMS.id(), payloadStart, 0, 0),
+            new MgiChunkEntry(MgiChunkType.INDEX_DATA.id(), payloadStart, 0, 0),
+            new MgiChunkEntry(MgiChunkType.SUBMESH_TABLE.id(), payloadStart, 0, 0)
         );
 
+        MgiHeader header = MgiHeader.v1(chunks.size(), MgiConstants.HEADER_SIZE_BYTES, 1);
+        MgiFile file = new MgiFile(header, chunks);
+
         MgiWriter writer = new MgiWriter();
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        writer.writeHeader(out, header);
-        writer.writeChunkDirectory(out, chunks);
+        byte[] bytes = writer.write(file);
 
-        byte[] bytes = out.toByteArray();
         MgiReader reader = new MgiReader();
-        ByteArrayInputStream in = new ByteArrayInputStream(bytes);
+        MgiFile read = reader.read(bytes);
 
-        MgiHeader readHeader = reader.readHeader(in);
-        List<MgiChunkEntry> readChunks = reader.readChunkDirectory(in, readHeader.chunkCount());
-
-        assertEquals(header, readHeader);
-        assertEquals(chunks, readChunks);
+        assertEquals(file.header(), read.header());
+        assertEquals(file.chunks(), read.chunks());
     }
 }

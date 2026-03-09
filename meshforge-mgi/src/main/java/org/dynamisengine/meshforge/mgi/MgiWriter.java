@@ -1,5 +1,6 @@
 package org.dynamisengine.meshforge.mgi;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.List;
@@ -8,6 +9,26 @@ import java.util.List;
  * Minimal MGI writer skeleton (header + chunk directory only).
  */
 public final class MgiWriter {
+    public byte[] write(MgiFile file) throws IOException {
+        if (file == null) {
+            throw new NullPointerException("file");
+        }
+        MgiValidator.validate(file.header(), file.chunks(), plannedFileSize(file));
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        writeHeader(out, file.header());
+
+        long written = MgiConstants.HEADER_SIZE_BYTES;
+        long targetOffset = file.header().chunkDirectoryOffsetBytes();
+        while (written < targetOffset) {
+            out.write(0);
+            written++;
+        }
+
+        writeChunkDirectory(out, file.chunks());
+        return out.toByteArray();
+    }
+
     public void writeHeader(OutputStream output, MgiHeader header) throws IOException {
         if (output == null) {
             throw new NullPointerException("output");
@@ -39,5 +60,17 @@ public final class MgiWriter {
             MgiIo.writeLongLe(output, chunk.lengthBytes());
             MgiIo.writeLongLe(output, 0L); // reserved
         }
+    }
+
+    private static long plannedFileSize(MgiFile file) {
+        long directoryBytes = (long) file.chunks().size() * MgiConstants.CHUNK_ENTRY_SIZE_BYTES;
+        long max = Math.max(
+            file.header().chunkDirectoryOffsetBytes() + directoryBytes,
+            MgiConstants.HEADER_SIZE_BYTES
+        );
+        for (MgiChunkEntry chunk : file.chunks()) {
+            max = Math.max(max, chunk.endExclusive());
+        }
+        return max;
     }
 }

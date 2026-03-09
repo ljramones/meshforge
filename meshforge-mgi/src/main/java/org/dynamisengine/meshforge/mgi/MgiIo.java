@@ -37,4 +37,26 @@ final class MgiIo {
         long hi = Integer.toUnsignedLong(readIntLe(in));
         return lo | (hi << 32);
     }
+
+    static byte[] readFully(InputStream in) throws IOException {
+        return in.readAllBytes();
+    }
+
+    static void skipFully(InputStream in, long bytes) throws IOException {
+        if (bytes < 0L) {
+            throw new IllegalArgumentException("bytes must be >= 0");
+        }
+        long remaining = bytes;
+        while (remaining > 0L) {
+            long skipped = in.skip(remaining);
+            if (skipped <= 0L) {
+                if (in.read() < 0) {
+                    throw new EOFException("Unexpected EOF while skipping bytes");
+                }
+                remaining -= 1L;
+            } else {
+                remaining -= skipped;
+            }
+        }
+    }
 }

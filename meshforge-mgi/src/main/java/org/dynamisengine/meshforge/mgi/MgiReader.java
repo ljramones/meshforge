@@ -1,5 +1,6 @@
 package org.dynamisengine.meshforge.mgi;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -9,6 +10,24 @@ import java.util.List;
  * Minimal MGI reader skeleton (header + chunk directory only).
  */
 public final class MgiReader {
+    public MgiFile read(byte[] bytes) throws IOException {
+        if (bytes == null) {
+            throw new NullPointerException("bytes");
+        }
+        ByteArrayInputStream in = new ByteArrayInputStream(bytes);
+        MgiHeader header = readHeader(in);
+
+        long currentOffset = MgiConstants.HEADER_SIZE_BYTES;
+        long targetOffset = header.chunkDirectoryOffsetBytes();
+        if (targetOffset > currentOffset) {
+            MgiIo.skipFully(in, targetOffset - currentOffset);
+        }
+
+        List<MgiChunkEntry> chunks = readChunkDirectory(in, header.chunkCount());
+        MgiValidator.validate(header, chunks, bytes.length);
+        return new MgiFile(header, chunks);
+    }
+
     public MgiHeader readHeader(InputStream input) throws IOException {
         if (input == null) {
             throw new NullPointerException("input");
