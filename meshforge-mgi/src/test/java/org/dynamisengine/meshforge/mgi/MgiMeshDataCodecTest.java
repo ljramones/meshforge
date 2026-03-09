@@ -31,6 +31,13 @@ class MgiMeshDataCodecTest {
     void roundTripsCanonicalMeshDataThroughMgi() throws Exception {
         MeshData input = sampleTriangleMeshWithNormalsUv();
         MgiMeshDataCodec codec = new MgiMeshDataCodec();
+        MgiStaticMesh exported = MgiMeshDataCodec.toMgiStaticMesh(input);
+
+        assertNotNull(exported.canonicalMetadataOrNull());
+        assertEquals(input.vertexCount(), exported.canonicalMetadataOrNull().canonicalVertexCount());
+        assertEquals(input.indicesOrNull().length, exported.canonicalMetadataOrNull().canonicalIndexCount());
+        assertTrue(exported.canonicalMetadataOrNull().degenerateFree());
+        assertTrue(exported.canonicalMetadataOrNull().trustedCanonical());
 
         byte[] bytes = codec.write(input);
         MeshData output = codec.read(bytes);

@@ -16,6 +16,7 @@ public final class MgiStaticMeshCodec {
     private static final int MESH_TABLE_ENTRY_INTS = 4;
     private static final int SUBMESH_ENTRY_INTS = 4;
     private static final int BOUNDS_FLOATS = 6;
+    private static final int METADATA_INTS = 4;
 
     private static final int SEM_POSITION = 1;
     private static final int SEM_NORMAL = 2;
@@ -35,9 +36,18 @@ public final class MgiStaticMeshCodec {
         byte[] indexBytes = encodeIndices(mesh.indices());
         byte[] submeshBytes = encodeSubmeshes(mesh.submeshes());
         byte[] boundsBytes = mesh.boundsOrNull() == null ? null : encodeBounds(mesh.boundsOrNull());
+        byte[] metadataBytes = mesh.canonicalMetadataOrNull() == null
+            ? null
+            : encodeMetadata(mesh.canonicalMetadataOrNull());
 
         long directoryOffset = MgiConstants.HEADER_SIZE_BYTES;
-        int chunkCount = boundsBytes == null ? 5 : 6;
+        int chunkCount = 5;
+        if (boundsBytes != null) {
+            chunkCount++;
+        }
+        if (metadataBytes != null) {
+            chunkCount++;
+        }
         long payloadOffset = directoryOffset + ((long) chunkCount * MgiConstants.CHUNK_ENTRY_SIZE_BYTES);
 
         MgiChunkEntry meshTable = new MgiChunkEntry(MgiChunkType.MESH_TABLE.id(), payloadOffset, meshTableBytes.length, 0);
@@ -53,14 +63,26 @@ public final class MgiStaticMeshCodec {
 
         List<MgiChunkEntry> entries;
         MgiChunkEntry bounds = null;
+        MgiChunkEntry metadata = null;
         if (boundsBytes == null) {
             entries = List.of(meshTable, attrSchema, vertices, indices, submeshes);
         } else {
             bounds = new MgiChunkEntry(MgiChunkType.BOUNDS.id(), payloadOffset, boundsBytes.length, 0);
             entries = List.of(meshTable, attrSchema, vertices, indices, submeshes, bounds);
+            payloadOffset = bounds.endExclusive();
+        }
+        if (metadataBytes != null) {
+            metadata = new MgiChunkEntry(MgiChunkType.METADATA.id(), payloadOffset, metadataBytes.length, 0);
+            if (bounds == null) {
+                entries = List.of(meshTable, attrSchema, vertices, indices, submeshes, metadata);
+            } else {
+                entries = List.of(meshTable, attrSchema, vertices, indices, submeshes, bounds, metadata);
+            }
         }
         MgiHeader header = MgiHeader.v1(entries.size(), directoryOffset, 1);
-        long fileSize = bounds == null ? submeshes.endExclusive() : bounds.endExclusive();
+        long fileSize = metadata != null
+            ? metadata.endExclusive()
+            : (bounds == null ? submeshes.endExclusive() : bounds.endExclusive());
         MgiValidator.validate(header, entries, fileSize);
 
         ByteArrayOutputStream out = new ByteArrayOutputStream((int) fileSize);
@@ -74,6 +96,9 @@ public final class MgiStaticMeshCodec {
         out.write(submeshBytes);
         if (boundsBytes != null) {
             out.write(boundsBytes);
+        }
+        if (metadataBytes != null) {
+            out.write(metadataBytes);
         }
         return out.toByteArray();
     }
@@ -100,6 +125,7 @@ public final class MgiStaticMeshCodec {
         MgiChunkEntry indicesEntry = required(byType, MgiChunkType.INDEX_DATA);
         MgiChunkEntry submeshEntry = required(byType, MgiChunkType.SUBMESH_TABLE);
         MgiChunkEntry boundsEntry = byType.get(MgiChunkType.BOUNDS);
+        MgiChunkEntry metadataEntry = byType.get(MgiChunkType.METADATA);
 
         int[] meshTable = decodeIntPayload(bytes, meshTableEntry, MESH_TABLE_ENTRY_INTS);
         int vertexCount = meshTable[0];
@@ -119,12 +145,14 @@ public final class MgiStaticMeshCodec {
         }
 
         MgiAabb bounds = decodeBounds(bytes, boundsEntry);
+        MgiCanonicalMetadata metadata = decodeMetadata(bytes, metadataEntry);
 
         MgiStaticMesh mesh = new MgiStaticMesh(
             streams.positions,
             streams.normals,
             streams.uv0,
             bounds,
+            metadata,
             indices,
             List.of(ranges)
         );
@@ -208,6 +236,15 @@ public final class MgiStaticMeshCodec {
         b.putFloat(bounds.maxX());
         b.putFloat(bounds.maxY());
         b.putFloat(bounds.maxZ());
+        return b.array();
+    }
+
+    private static byte[] encodeMetadata(MgiCanonicalMetadata metadata) {
+        ByteBuffer b = ByteBuffer.allocate(METADATA_INTS * Integer.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+        b.putInt(metadata.canonicalVertexCount());
+        b.putInt(metadata.canonicalIndexCount());
+        b.putInt(metadata.flags());
+        b.putInt(0);
         return b.array();
     }
 
@@ -328,6 +365,22 @@ public final class MgiStaticMeshCodec {
         );
     }
 
+    private static MgiCanonicalMetadata decodeMetadata(byte[] bytes, MgiChunkEntry entry) {
+        if (entry == null) {
+            return null;
+        }
+        if (entry.lengthBytes() != (long) METADATA_INTS * Integer.BYTES) {
+            throw new MgiValidationException("invalid metadata payload size");
+        }
+        ByteBuffer b = ByteBuffer.wrap(bytes, Math.toIntExact(entry.offsetBytes()), Math.toIntExact(entry.lengthBytes()))
+            .order(ByteOrder.LITTLE_ENDIAN);
+        return new MgiCanonicalMetadata(
+            b.getInt(),
+            b.getInt(),
+            b.getInt()
+        );
+    }
+
     private static MgiChunkEntry required(Map<MgiChunkType, MgiChunkEntry> map, MgiChunkType type) {
         MgiChunkEntry entry = map.get(type);
         if (entry == null) {
@@ -360,6 +413,15 @@ public final class MgiStaticMeshCodec {
             long end = (long) submesh.firstIndex() + submesh.indexCount();
             if (end > totalIndexCount) {
                 throw new MgiValidationException("submesh range exceeds index count");
+            }
+        }
+        if (mesh.canonicalMetadataOrNull() != null) {
+            MgiCanonicalMetadata metadata = mesh.canonicalMetadataOrNull();
+            if (metadata.canonicalVertexCount() != vertexCount) {
+                throw new MgiValidationException("metadata canonicalVertexCount mismatch");
+            }
+            if (metadata.canonicalIndexCount() != totalIndexCount) {
+                throw new MgiValidationException("metadata canonicalIndexCount mismatch");
             }
         }
     }

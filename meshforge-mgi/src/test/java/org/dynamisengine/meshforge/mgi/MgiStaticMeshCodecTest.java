@@ -23,6 +23,7 @@ class MgiStaticMeshCodecTest {
             null,
             null,
             null,
+            null,
             new int[] {0, 1, 2, 1, 3, 2},
             List.of(
                 new MgiSubmeshRange(0, 3, 0),
@@ -38,6 +39,7 @@ class MgiStaticMeshCodecTest {
         assertNull(output.normalsOrNull());
         assertNull(output.uv0OrNull());
         assertNull(output.boundsOrNull());
+        assertNull(output.canonicalMetadataOrNull());
         assertArrayEquals(input.indices(), output.indices());
         assertEquals(input.submeshes(), output.submeshes());
     }
@@ -61,6 +63,7 @@ class MgiStaticMeshCodecTest {
                 0f, 1f
             },
             new MgiAabb(0f, 0f, -1f, 1f, 1f, 0f),
+            new MgiCanonicalMetadata(3, 3, MgiCanonicalMetadata.FLAG_DEGENERATE_FREE),
             new int[] {0, 1, 2},
             List.of(new MgiSubmeshRange(0, 3, 0))
         );
@@ -73,6 +76,7 @@ class MgiStaticMeshCodecTest {
         assertArrayEquals(input.normalsOrNull(), output.normalsOrNull());
         assertArrayEquals(input.uv0OrNull(), output.uv0OrNull());
         assertEquals(input.boundsOrNull(), output.boundsOrNull());
+        assertEquals(input.canonicalMetadataOrNull(), output.canonicalMetadataOrNull());
         assertArrayEquals(input.indices(), output.indices());
     }
 
@@ -84,6 +88,7 @@ class MgiStaticMeshCodecTest {
                 1f, 0f, 0f,
                 0f, 1f, 0f
             },
+            null,
             null,
             null,
             null,
@@ -106,6 +111,7 @@ class MgiStaticMeshCodecTest {
             null,
             null,
             null,
+            null,
             new int[] {0, 1, 2},
             List.of(new MgiSubmeshRange(2, 3, 0))
         );
@@ -125,6 +131,7 @@ class MgiStaticMeshCodecTest {
             null,
             null,
             new MgiAabb(0f, 0f, 0f, 1f, 1f, 0f),
+            null,
             new int[] {0, 1, 2},
             List.of(new MgiSubmeshRange(0, 3, 0))
         );
@@ -146,5 +153,25 @@ class MgiStaticMeshCodecTest {
         bytes[lengthFieldOffset + 7] = 0;
 
         assertThrows(MgiValidationException.class, () -> codec.read(bytes));
+    }
+
+    @Test
+    void rejectsMetadataCountMismatchOnWrite() {
+        MgiStaticMesh invalid = new MgiStaticMesh(
+            new float[] {
+                0f, 0f, 0f,
+                1f, 0f, 0f,
+                0f, 1f, 0f
+            },
+            null,
+            null,
+            null,
+            new MgiCanonicalMetadata(99, 3, MgiCanonicalMetadata.FLAG_DEGENERATE_FREE),
+            new int[] {0, 1, 2},
+            List.of(new MgiSubmeshRange(0, 3, 0))
+        );
+
+        MgiStaticMeshCodec codec = new MgiStaticMeshCodec();
+        assertThrows(MgiValidationException.class, () -> codec.write(invalid));
     }
 }

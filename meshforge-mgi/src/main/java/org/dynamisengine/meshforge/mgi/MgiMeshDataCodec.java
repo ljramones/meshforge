@@ -70,7 +70,8 @@ public final class MgiMeshDataCodec {
         float[] packedUv0 = uv0 == null ? null : extractF32(uv0, 2);
         List<MgiSubmeshRange> ranges = convertSubmeshes(meshData.submeshes(), indices.length);
         MgiAabb bounds = toMgiAabb(meshData);
-        return new MgiStaticMesh(packedPositions, packedNormals, packedUv0, bounds, indices, ranges);
+        MgiCanonicalMetadata metadata = canonicalMetadata(meshData, packedPositions);
+        return new MgiStaticMesh(packedPositions, packedNormals, packedUv0, bounds, metadata, indices, ranges);
     }
 
     public static MeshData toMeshData(MgiStaticMesh mesh) {
@@ -209,5 +210,66 @@ public final class MgiMeshDataCodec {
             new Aabbf(aabb.minX(), aabb.minY(), aabb.minZ(), aabb.maxX(), aabb.maxY(), aabb.maxZ()),
             new Spheref(centerX, centerY, centerZ, radius)
         );
+    }
+
+    private static MgiCanonicalMetadata canonicalMetadata(MeshData meshData, float[] packedPositions) {
+        int[] indices = meshData.indicesOrNull();
+        int vertexCount = packedPositions.length / 3;
+        int indexCount = indices == null ? 0 : indices.length;
+        int flags = 0;
+        if (isDegenerateFree(indices, packedPositions)) {
+            flags |= MgiCanonicalMetadata.FLAG_DEGENERATE_FREE;
+        }
+        if ((flags & MgiCanonicalMetadata.FLAG_DEGENERATE_FREE) != 0 && meshData.boundsOrNull() != null) {
+            flags |= MgiCanonicalMetadata.FLAG_TRUSTED_CANONICAL;
+        }
+        return new MgiCanonicalMetadata(vertexCount, indexCount, flags);
+    }
+
+    private static boolean isDegenerateFree(int[] indices, float[] positions) {
+        if (indices == null || indices.length < 3) {
+            return true;
+        }
+        for (int i = 0; i < indices.length; i += 3) {
+            int a = indices[i];
+            int b = indices[i + 1];
+            int c = indices[i + 2];
+            if (a == b || b == c || a == c) {
+                return false;
+            }
+            if (isZeroArea(a, b, c, positions)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isZeroArea(int ia, int ib, int ic, float[] pos) {
+        int a = ia * 3;
+        int b = ib * 3;
+        int c = ic * 3;
+
+        float ax = pos[a];
+        float ay = pos[a + 1];
+        float az = pos[a + 2];
+        float bx = pos[b];
+        float by = pos[b + 1];
+        float bz = pos[b + 2];
+        float cx = pos[c];
+        float cy = pos[c + 1];
+        float cz = pos[c + 2];
+
+        float abx = bx - ax;
+        float aby = by - ay;
+        float abz = bz - az;
+        float acx = cx - ax;
+        float acy = cy - ay;
+        float acz = cz - az;
+
+        float nx = aby * acz - abz * acy;
+        float ny = abz * acx - abx * acz;
+        float nz = abx * acy - aby * acx;
+        float area2 = nx * nx + ny * ny + nz * nz;
+        return area2 <= 1.0e-20f;
     }
 }
