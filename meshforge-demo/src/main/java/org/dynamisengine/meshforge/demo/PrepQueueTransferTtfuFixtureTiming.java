@@ -101,18 +101,23 @@ public final class PrepQueueTransferTtfuFixtureTiming {
         System.out.println("prep+queue+transfer timing (median + p95)");
         System.out.printf(Locale.ROOT, "warmup=%d runs=%d maxInflight=%d mode=%s%n", warmup, runs, maxInflight, mode.label);
         System.out.println();
-        System.out.println("| Fixture | Mode | Load/Clone ms | Pipeline ms | Plan ms | Pack ms | Bridge ms | Queue ms | Transfer ms | Total TTFU ms | Triangles | Upload Bytes |");
-        System.out.println("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+        System.out.println("| Fixture | Mode | Load/Clone ms | Pipeline ms | Pipeline Attr ms | Pipeline Topology ms | Plan ms | Pack ms | Pack Vertex ms | Pack Index ms | Pack Submesh ms | Bridge ms | Queue ms | Transfer ms | Total TTFU ms | Triangles | Upload Bytes |");
+        System.out.println("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
         for (Row row : rows) {
             System.out.printf(
                 Locale.ROOT,
-                "| `%s` | %s | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %d | %d |%n",
+                "| `%s` | %s | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %d | %d |%n",
                 row.name,
                 row.mode,
                 row.loadOrCloneMedianMs,
                 row.pipelineMedianMs,
+                row.pipelineAttrMedianMs,
+                row.pipelineTopologyMedianMs,
                 row.planMedianMs,
                 row.packMedianMs,
+                row.packVertexPayloadMedianMs,
+                row.packIndexPayloadMedianMs,
+                row.packSubmeshMedianMs,
                 row.bridgeMedianMs,
                 row.queueMedianMs,
                 row.transferMedianMs,
@@ -124,18 +129,23 @@ public final class PrepQueueTransferTtfuFixtureTiming {
 
         System.out.println();
         System.out.println("p95 breakdown");
-        System.out.println("| Fixture | Mode | Load/Clone p95 | Pipeline p95 | Plan p95 | Pack p95 | Bridge p95 | Queue p95 | Transfer p95 | Total TTFU p95 |");
-        System.out.println("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|");
+        System.out.println("| Fixture | Mode | Load/Clone p95 | Pipeline p95 | Pipeline Attr p95 | Pipeline Topology p95 | Plan p95 | Pack p95 | Pack Vertex p95 | Pack Index p95 | Pack Submesh p95 | Bridge p95 | Queue p95 | Transfer p95 | Total TTFU p95 |");
+        System.out.println("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
         for (Row row : rows) {
             System.out.printf(
                 Locale.ROOT,
-                "| `%s` | %s | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f |%n",
+                "| `%s` | %s | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f |%n",
                 row.name,
                 row.mode,
                 row.loadOrCloneP95Ms,
                 row.pipelineP95Ms,
+                row.pipelineAttrP95Ms,
+                row.pipelineTopologyP95Ms,
                 row.planP95Ms,
                 row.packP95Ms,
+                row.packVertexPayloadP95Ms,
+                row.packIndexPayloadP95Ms,
+                row.packSubmeshP95Ms,
                 row.bridgeP95Ms,
                 row.queueP95Ms,
                 row.transferP95Ms,
@@ -156,8 +166,13 @@ public final class PrepQueueTransferTtfuFixtureTiming {
         int total = warmup + runs;
         List<Long> loadOrCloneNs = new ArrayList<>(runs);
         List<Long> pipelineNs = new ArrayList<>(runs);
+        List<Long> pipelineAttrNs = new ArrayList<>(runs);
+        List<Long> pipelineTopologyNs = new ArrayList<>(runs);
         List<Long> planNs = new ArrayList<>(runs);
         List<Long> packNs = new ArrayList<>(runs);
+        List<Long> packVertexPayloadNs = new ArrayList<>(runs);
+        List<Long> packIndexPayloadNs = new ArrayList<>(runs);
+        List<Long> packSubmeshNs = new ArrayList<>(runs);
         List<Long> bridgeNs = new ArrayList<>(runs);
         List<Long> queueNs = new ArrayList<>(runs);
         List<Long> transferNs = new ArrayList<>(runs);
@@ -190,14 +205,16 @@ public final class PrepQueueTransferTtfuFixtureTiming {
                 }
                 long tLoadOrClone = System.nanoTime();
 
-                MeshData processed = Pipelines.realtimeFast(loaded);
+                Pipelines.RuntimeStageProfile pipelineProfile = new Pipelines.RuntimeStageProfile();
+                MeshData processed = Pipelines.realtimeFastProfiled(loaded, pipelineProfile);
                 long tPipeline = System.nanoTime();
 
                 MeshPacker.RuntimePackPlan runtimePlan = MeshPacker.buildRuntimePlan(processed, spec);
                 long tPlan = System.nanoTime();
 
                 MeshPacker.RuntimePackWorkspace workspace = new MeshPacker.RuntimePackWorkspace();
-                MeshPacker.packPlannedInto(runtimePlan, workspace);
+                MeshPacker.RuntimePackProfile packProfile = new MeshPacker.RuntimePackProfile();
+                MeshPacker.packPlannedIntoProfiled(runtimePlan, workspace, packProfile);
                 long tPack = System.nanoTime();
 
                 RuntimeGeometryPayload payload =
@@ -211,8 +228,16 @@ public final class PrepQueueTransferTtfuFixtureTiming {
                 if (i >= warmup) {
                     loadOrCloneNs.add(tLoadOrClone - t0);
                     pipelineNs.add(tPipeline - tLoadOrClone);
+                    pipelineAttrNs.add(pipelineProfile.normalsNs() + pipelineProfile.tangentsNs());
+                    pipelineTopologyNs.add(
+                        pipelineProfile.validateNs()
+                            + pipelineProfile.removeDegeneratesNs()
+                            + pipelineProfile.boundsNs());
                     planNs.add(tPlan - tPipeline);
                     packNs.add(tPack - tPlan);
+                    packVertexPayloadNs.add(packProfile.vertexPayloadNs());
+                    packIndexPayloadNs.add(packProfile.indexPayloadNs());
+                    packSubmeshNs.add(packProfile.submeshMetadataNs());
                     bridgeNs.add(t1 - tPack);
                     queueNs.add(timing.queueWaitNanos());
                     transferNs.add(timing.transferNanos());
@@ -236,10 +261,20 @@ public final class PrepQueueTransferTtfuFixtureTiming {
             toMs(p95(loadOrCloneNs)),
             toMs(median(pipelineNs)),
             toMs(p95(pipelineNs)),
+            toMs(median(pipelineAttrNs)),
+            toMs(p95(pipelineAttrNs)),
+            toMs(median(pipelineTopologyNs)),
+            toMs(p95(pipelineTopologyNs)),
             toMs(median(planNs)),
             toMs(p95(planNs)),
             toMs(median(packNs)),
             toMs(p95(packNs)),
+            toMs(median(packVertexPayloadNs)),
+            toMs(p95(packVertexPayloadNs)),
+            toMs(median(packIndexPayloadNs)),
+            toMs(p95(packIndexPayloadNs)),
+            toMs(median(packSubmeshNs)),
+            toMs(p95(packSubmeshNs)),
             toMs(median(bridgeNs)),
             toMs(p95(bridgeNs)),
             toMs(median(queueNs)),
@@ -389,10 +424,20 @@ public final class PrepQueueTransferTtfuFixtureTiming {
         double loadOrCloneP95Ms,
         double pipelineMedianMs,
         double pipelineP95Ms,
+        double pipelineAttrMedianMs,
+        double pipelineAttrP95Ms,
+        double pipelineTopologyMedianMs,
+        double pipelineTopologyP95Ms,
         double planMedianMs,
         double planP95Ms,
         double packMedianMs,
         double packP95Ms,
+        double packVertexPayloadMedianMs,
+        double packVertexPayloadP95Ms,
+        double packIndexPayloadMedianMs,
+        double packIndexPayloadP95Ms,
+        double packSubmeshMedianMs,
+        double packSubmeshP95Ms,
         double bridgeMedianMs,
         double bridgeP95Ms,
         double queueMedianMs,
