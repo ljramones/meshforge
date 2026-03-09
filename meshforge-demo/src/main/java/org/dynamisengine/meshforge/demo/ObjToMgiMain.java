@@ -118,6 +118,7 @@ public final class ObjToMgiMain {
             base.boundsOrNull(),
             base.canonicalMetadataOrNull(),
             meshletData,
+            base.meshletLodDataOrNull(),
             base.indices(),
             base.submeshes()
         );

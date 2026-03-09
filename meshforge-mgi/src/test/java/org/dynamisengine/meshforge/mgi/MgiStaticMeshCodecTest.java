@@ -27,6 +27,7 @@ class MgiStaticMeshCodecTest {
             null,
             null,
             null,
+            null,
             new int[] {0, 1, 2, 1, 3, 2},
             List.of(
                 new MgiSubmeshRange(0, 3, 0),
@@ -69,6 +70,7 @@ class MgiStaticMeshCodecTest {
             new MgiAabb(0f, 0f, -1f, 1f, 1f, 0f),
             new MgiCanonicalMetadata(3, 3, MgiCanonicalMetadata.FLAG_DEGENERATE_FREE),
             null,
+            null,
             new int[] {0, 1, 2},
             List.of(new MgiSubmeshRange(0, 3, 0))
         );
@@ -105,6 +107,7 @@ class MgiStaticMeshCodecTest {
                 new int[] {0, 1, 2, 0, 2, 3},
                 List.of(new MgiMeshletBounds(0f, 0f, 0f, 1f, 1f, 1f))
             ),
+            null,
             new int[] {0, 1, 2, 0, 2, 3},
             List.of(new MgiSubmeshRange(0, 6, 0))
         );
@@ -132,6 +135,7 @@ class MgiStaticMeshCodecTest {
             null,
             null,
             null,
+            null,
             new int[] {0, 1, 3},
             List.of(new MgiSubmeshRange(0, 3, 0))
         );
@@ -148,6 +152,7 @@ class MgiStaticMeshCodecTest {
                 1f, 0f, 0f,
                 0f, 1f, 0f
             },
+            null,
             null,
             null,
             null,
@@ -172,6 +177,7 @@ class MgiStaticMeshCodecTest {
             null,
             null,
             new MgiAabb(0f, 0f, 0f, 1f, 1f, 0f),
+            null,
             null,
             null,
             new int[] {0, 1, 2},
@@ -210,6 +216,7 @@ class MgiStaticMeshCodecTest {
             null,
             new MgiCanonicalMetadata(99, 3, MgiCanonicalMetadata.FLAG_DEGENERATE_FREE),
             null,
+            null,
             new int[] {0, 1, 2},
             List.of(new MgiSubmeshRange(0, 3, 0))
         );
@@ -237,6 +244,7 @@ class MgiStaticMeshCodecTest {
                 new int[] {0, 1, 2, 0, 2, 3},
                 List.of(new MgiMeshletBounds(0f, 0f, 0f, 1f, 1f, 1f))
             ),
+            null,
             new int[] {0, 1, 2, 0, 2, 3},
             List.of(new MgiSubmeshRange(0, 6, 0))
         );
@@ -272,6 +280,7 @@ class MgiStaticMeshCodecTest {
                 new int[] {0, 1, 2, 0, 2, 3},
                 List.of(new MgiMeshletBounds(0f, 0f, 0f, 1f, 1f, 1f))
             ),
+            null,
             new int[] {0, 1, 2, 0, 2, 3},
             List.of(new MgiSubmeshRange(0, 6, 0))
         );

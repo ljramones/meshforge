@@ -11,6 +11,7 @@ import java.util.List;
  * @param boundsOrNull optional prebaked bounds payload
  * @param canonicalMetadataOrNull optional canonical/trust metadata
  * @param meshletDataOrNull optional meshlet metadata payload
+ * @param meshletLodDataOrNull optional meshlet LOD metadata payload
  * @param indices triangle index buffer (uint32 domain)
  * @param submeshes submesh index ranges
  */
@@ -21,6 +22,7 @@ public record MgiStaticMesh(
     MgiAabb boundsOrNull,
     MgiCanonicalMetadata canonicalMetadataOrNull,
     MgiMeshletData meshletDataOrNull,
+    MgiMeshletLodData meshletLodDataOrNull,
     int[] indices,
     List<MgiSubmeshRange> submeshes
 ) {
@@ -67,6 +69,9 @@ public record MgiStaticMesh(
             meshletDataOrNull.vertexRemap(),
             meshletDataOrNull.triangles(),
             meshletDataOrNull.bounds()
+        );
+        meshletLodDataOrNull = meshletLodDataOrNull == null ? null : new MgiMeshletLodData(
+            meshletLodDataOrNull.levels()
         );
         indices = indices.clone();
         submeshes = List.copyOf(submeshes);

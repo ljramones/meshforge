@@ -17,7 +17,8 @@ public enum MgiChunkType {
     MESHLET_DESCRIPTORS(0x1101, false),
     MESHLET_VERTEX_REMAP(0x1102, false),
     MESHLET_TRIANGLES(0x1103, false),
-    MESHLET_BOUNDS(0x1104, false);
+    MESHLET_BOUNDS(0x1104, false),
+    MESHLET_LOD_LEVELS(0x1105, false);
 
     private static final Map<Integer, MgiChunkType> BY_ID = new HashMap<>();
 
