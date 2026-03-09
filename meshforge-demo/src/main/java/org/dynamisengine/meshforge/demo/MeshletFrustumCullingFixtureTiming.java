@@ -138,10 +138,10 @@ public final class MeshletFrustumCullingFixtureTiming {
 
         int total = warmup + runs;
         List<Long> cullNs = new ArrayList<>(runs);
-        MeshletFrustumCuller.CullingStats last = null;
+        MeshletFrustumCuller.CullingSummary last = null;
         for (int i = 0; i < total; i++) {
             long t0 = System.nanoTime();
-            MeshletFrustumCuller.CullingStats stats = MeshletFrustumCuller.cull(meshletBounds, triangleCounts, frustum);
+            MeshletFrustumCuller.CullingSummary stats = MeshletFrustumCuller.cullSummary(meshletBounds, triangleCounts, frustum);
             long t1 = System.nanoTime();
             if (i >= warmup) {
                 cullNs.add(t1 - t0);

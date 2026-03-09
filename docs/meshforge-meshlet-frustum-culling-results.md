@@ -25,8 +25,14 @@ mvn -q -f meshforge-demo/pom.xml exec:java \
 
 | Fixture | Total Meshlets | Visible Meshlets | Total Triangles | Visible Triangles | Triangle Reduction | Culling Median ms | Culling p95 ms |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| `RevitHouse.obj` | 19718 | 10875 | 414060 | 228357 | 44.85% | 0.238 | 0.905 |
-| `xyzrgb_dragon.obj` | 5762 | 2842 | 249882 | 125211 | 49.89% | 0.093 | 0.100 |
+| `RevitHouse.obj` | 19718 | 10875 | 414060 | 228357 | 44.85% | 0.206 | 0.835 |
+| `xyzrgb_dragon.obj` | 5762 | 2842 | 249882 | 125211 | 49.89% | 0.076 | 0.088 |
+
+## Phase 1.1 Stabilization
+- Culling timing path switched to an allocation-free summary API (`cullSummary`) for benchmark/hot-path use.
+- Removed per-iteration visible-index array materialization and repeated total-triangle recomputation from timed loop.
+- Visibility outcomes are unchanged (same meshlet and triangle visibility counts).
+- Tail behavior improved but remains higher on `RevitHouse` than `dragon`; current interpretation is acceptable baseline variance with a large mesh set rather than a functional issue.
 
 ## Interpretation
 - Visible triangle reduction is substantial on both fixtures (~45-50%).

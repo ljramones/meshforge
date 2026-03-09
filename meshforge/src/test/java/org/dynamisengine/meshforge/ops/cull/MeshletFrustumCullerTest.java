@@ -57,6 +57,26 @@ class MeshletFrustumCullerTest {
     }
 
     @Test
+    void allocationFreeSummaryMatchesCullingStats() {
+        List<Aabbf> bounds = List.of(
+            new Aabbf(0f, 0f, 0f, 1f, 1f, 1f),
+            new Aabbf(8f, 8f, 8f, 9f, 9f, 9f),
+            new Aabbf(20f, 20f, 20f, 21f, 21f, 21f)
+        );
+        int[] triangleCounts = new int[] {10, 20, 30};
+        ViewFrustum frustum = ViewFrustum.fromAabbWindow(new Aabbf(0f, 0f, 0f, 10f, 10f, 10f));
+
+        MeshletFrustumCuller.CullingStats withIndices = MeshletFrustumCuller.cull(bounds, triangleCounts, frustum);
+        MeshletFrustumCuller.CullingSummary summary = MeshletFrustumCuller.cullSummary(bounds, triangleCounts, frustum);
+
+        assertEquals(withIndices.totalMeshlets(), summary.totalMeshlets());
+        assertEquals(withIndices.visibleMeshlets(), summary.visibleMeshlets());
+        assertEquals(withIndices.totalTriangles(), summary.totalTriangles());
+        assertEquals(withIndices.visibleTriangles(), summary.visibleTriangles());
+        assertEquals(withIndices.triangleReductionPercent(), summary.triangleReductionPercent());
+    }
+
+    @Test
     void rejectsMismatchedTriangleCountsLength() {
         List<Aabbf> bounds = List.of(new Aabbf(0f, 0f, 0f, 1f, 1f, 1f));
         int[] triangleCounts = new int[] {1, 2};
