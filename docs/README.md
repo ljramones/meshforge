@@ -37,6 +37,7 @@ Last updated: 2026-03-09
 - `docs/meshforge-mgi-meshlet-extension-plan.md` - meshlet extension architecture and chunk model
 - `docs/meshforge-mgi-meshlet-benchmark-results.md` - runtime generation vs prebaked meshlet load results
 - `docs/meshforge-capability-priority.md` - geometry subsystem capability priority roadmap
+- `docs/meshforge-tessellation-subdivision-foundation.md` - tessellation/subdivision metadata and runtime handoff foundation
 
 - `docs/roadmap.md` - active and next priorities
 - `docs/plan-v1.md` - historical v1 completion snapshot
