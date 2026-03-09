@@ -45,14 +45,26 @@ public final class MgiMeshDataCodec {
             throw new IllegalArgumentException("MGI v1 static mesh codec requires POSITION[0] format F32x3");
         }
 
+        VertexAttributeView normals = optional(meshData, AttributeSemantic.NORMAL, 0);
+        if (normals != null && normals.format() != VertexFormat.F32x3) {
+            throw new IllegalArgumentException("MGI v1 static mesh codec supports NORMAL[0] format F32x3 only");
+        }
+
+        VertexAttributeView uv0 = optional(meshData, AttributeSemantic.UV, 0);
+        if (uv0 != null && uv0.format() != VertexFormat.F32x2) {
+            throw new IllegalArgumentException("MGI v1 static mesh codec supports UV[0] format F32x2 only");
+        }
+
         int[] indices = meshData.indicesOrNull();
         if (indices == null) {
             throw new IllegalArgumentException("MGI v1 static mesh codec requires indexed geometry");
         }
 
-        float[] packedPositions = extractPositions(positions);
+        float[] packedPositions = extractF32(positions, 3);
+        float[] packedNormals = normals == null ? null : extractF32(normals, 3);
+        float[] packedUv0 = uv0 == null ? null : extractF32(uv0, 2);
         List<MgiSubmeshRange> ranges = convertSubmeshes(meshData.submeshes(), indices.length);
-        return new MgiStaticMesh(packedPositions, indices, ranges);
+        return new MgiStaticMesh(packedPositions, packedNormals, packedUv0, indices, ranges);
     }
 
     public static MeshData toMeshData(MgiStaticMesh mesh) {
@@ -60,9 +72,14 @@ public final class MgiMeshDataCodec {
             throw new NullPointerException("mesh");
         }
 
-        VertexSchema schema = VertexSchema.builder()
-            .add(AttributeSemantic.POSITION, 0, VertexFormat.F32x3)
-            .build();
+        VertexSchema.Builder schema = VertexSchema.builder()
+            .add(AttributeSemantic.POSITION, 0, VertexFormat.F32x3);
+        if (mesh.normalsOrNull() != null) {
+            schema.add(AttributeSemantic.NORMAL, 0, VertexFormat.F32x3);
+        }
+        if (mesh.uv0OrNull() != null) {
+            schema.add(AttributeSemantic.UV, 0, VertexFormat.F32x2);
+        }
 
         List<Submesh> submeshes = new ArrayList<>(mesh.submeshes().size());
         for (MgiSubmeshRange range : mesh.submeshes()) {
@@ -71,43 +88,56 @@ public final class MgiMeshDataCodec {
 
         MeshData data = new MeshData(
             Topology.TRIANGLES,
-            schema,
+            schema.build(),
             mesh.vertexCount(),
             mesh.indices(),
             submeshes
         );
 
-        VertexAttributeView positions = data.attribute(AttributeSemantic.POSITION, 0);
-        float[] positionData = mesh.positions();
-        float[] raw = positions.rawFloatArrayOrNull();
-        if (raw != null) {
-            System.arraycopy(positionData, 0, raw, 0, positionData.length);
-        } else {
-            int v = 0;
-            for (int i = 0; i < data.vertexCount(); i++) {
-                positions.setFloat(i, 0, positionData[v++]);
-                positions.setFloat(i, 1, positionData[v++]);
-                positions.setFloat(i, 2, positionData[v++]);
-            }
+        writeAttribute(data.attribute(AttributeSemantic.POSITION, 0), mesh.positions(), 3);
+        if (mesh.normalsOrNull() != null) {
+            writeAttribute(data.attribute(AttributeSemantic.NORMAL, 0), mesh.normalsOrNull(), 3);
+        }
+        if (mesh.uv0OrNull() != null) {
+            writeAttribute(data.attribute(AttributeSemantic.UV, 0), mesh.uv0OrNull(), 2);
         }
         return data;
     }
 
-    private static float[] extractPositions(VertexAttributeView positions) {
-        float[] raw = positions.rawFloatArrayOrNull();
+    private static VertexAttributeView optional(MeshData meshData, AttributeSemantic semantic, int setIndex) {
+        return meshData.has(semantic, setIndex) ? meshData.attribute(semantic, setIndex) : null;
+    }
+
+    private static float[] extractF32(VertexAttributeView view, int components) {
+        float[] raw = view.rawFloatArrayOrNull();
         if (raw != null) {
             return raw.clone();
         }
 
-        int vertexCount = positions.vertexCount();
-        float[] packed = new float[vertexCount * 3];
+        int vertexCount = view.vertexCount();
+        float[] packed = new float[vertexCount * components];
         int at = 0;
         for (int i = 0; i < vertexCount; i++) {
-            packed[at++] = positions.getFloat(i, 0);
-            packed[at++] = positions.getFloat(i, 1);
-            packed[at++] = positions.getFloat(i, 2);
+            for (int c = 0; c < components; c++) {
+                packed[at++] = view.getFloat(i, c);
+            }
         }
         return packed;
+    }
+
+    private static void writeAttribute(VertexAttributeView view, float[] values, int components) {
+        float[] raw = view.rawFloatArrayOrNull();
+        if (raw != null) {
+            System.arraycopy(values, 0, raw, 0, values.length);
+            return;
+        }
+
+        int at = 0;
+        for (int i = 0; i < view.vertexCount(); i++) {
+            for (int c = 0; c < components; c++) {
+                view.setFloat(i, c, values[at++]);
+            }
+        }
     }
 
     private static List<MgiSubmeshRange> convertSubmeshes(List<Submesh> source, int indexCount) {

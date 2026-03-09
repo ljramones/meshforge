@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -13,8 +14,13 @@ import java.util.Map;
  */
 public final class MgiStaticMeshCodec {
     private static final int MESH_TABLE_ENTRY_INTS = 4;
-    private static final int ATTR_SCHEMA_INTS = 5;
     private static final int SUBMESH_ENTRY_INTS = 4;
+
+    private static final int SEM_POSITION = 1;
+    private static final int SEM_NORMAL = 2;
+    private static final int SEM_UV0 = 3;
+
+    private static final int TYPE_FLOAT32 = 1;
 
     public byte[] write(MgiStaticMesh mesh) throws IOException {
         if (mesh == null) {
@@ -23,8 +29,8 @@ public final class MgiStaticMeshCodec {
         validateMesh(mesh);
 
         byte[] meshTableBytes = encodeMeshTable(mesh);
-        byte[] attrSchemaBytes = encodeAttributeSchema();
-        byte[] vertexBytes = encodeVertices(mesh.positions());
+        byte[] attrSchemaBytes = encodeAttributeSchema(mesh);
+        byte[] vertexBytes = encodeVertexStreams(mesh);
         byte[] indexBytes = encodeIndices(mesh.indices());
         byte[] submeshBytes = encodeSubmeshes(mesh.submeshes());
 
@@ -85,13 +91,9 @@ public final class MgiStaticMeshCodec {
         int indexCount = meshTable[1];
         int submeshCount = meshTable[2];
 
-        int[] attr = decodeIntPayload(bytes, attrSchemaEntry, ATTR_SCHEMA_INTS);
-        // v1 minimal schema guard: one position attribute with 3 float32 components and 12-byte stride.
-        if (attr[0] != 1 || attr[2] != 3 || attr[4] != 12) {
-            throw new MgiValidationException("unsupported attribute schema in minimal static mesh codec");
-        }
+        List<AttributeSpec> specs = decodeAttributeSchema(bytes, attrSchemaEntry);
+        DecodedStreams streams = decodeVertexStreams(bytes, verticesEntry, specs, vertexCount);
 
-        float[] positions = decodeFloatPayload(bytes, verticesEntry, vertexCount * 3);
         int[] indices = decodeIntPayload(bytes, indicesEntry, indexCount);
         int[] submeshInts = decodeIntPayload(bytes, submeshEntry, submeshCount * SUBMESH_ENTRY_INTS);
 
@@ -101,7 +103,13 @@ public final class MgiStaticMeshCodec {
             ranges[i] = new MgiSubmeshRange(submeshInts[base], submeshInts[base + 1], submeshInts[base + 2]);
         }
 
-        MgiStaticMesh mesh = new MgiStaticMesh(positions, indices, List.of(ranges));
+        MgiStaticMesh mesh = new MgiStaticMesh(
+            streams.positions,
+            streams.normals,
+            streams.uv0,
+            indices,
+            List.of(ranges)
+        );
         validateMesh(mesh);
         return mesh;
     }
@@ -115,20 +123,41 @@ public final class MgiStaticMeshCodec {
         return b.array();
     }
 
-    private static byte[] encodeAttributeSchema() {
-        ByteBuffer b = ByteBuffer.allocate(ATTR_SCHEMA_INTS * Integer.BYTES).order(ByteOrder.LITTLE_ENDIAN);
-        b.putInt(1);  // attribute count
-        b.putInt(1);  // semantic position
-        b.putInt(3);  // component count
-        b.putInt(3);  // component type float32
-        b.putInt(12); // stride bytes
+    private static byte[] encodeAttributeSchema(MgiStaticMesh mesh) {
+        ArrayList<AttributeSpec> specs = attributeSpecsFor(mesh);
+        ByteBuffer b = ByteBuffer.allocate((1 + (specs.size() * 4)) * Integer.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+        b.putInt(specs.size());
+        for (AttributeSpec spec : specs) {
+            b.putInt(spec.semanticId);
+            b.putInt(spec.components);
+            b.putInt(spec.componentTypeId);
+            b.putInt(spec.strideBytes);
+        }
         return b.array();
     }
 
-    private static byte[] encodeVertices(float[] positions) {
-        ByteBuffer b = ByteBuffer.allocate(positions.length * Float.BYTES).order(ByteOrder.LITTLE_ENDIAN);
-        for (float v : positions) {
+    private static byte[] encodeVertexStreams(MgiStaticMesh mesh) {
+        int floats = mesh.positions().length;
+        if (mesh.normalsOrNull() != null) {
+            floats += mesh.normalsOrNull().length;
+        }
+        if (mesh.uv0OrNull() != null) {
+            floats += mesh.uv0OrNull().length;
+        }
+
+        ByteBuffer b = ByteBuffer.allocate(floats * Float.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+        for (float v : mesh.positions()) {
             b.putFloat(v);
+        }
+        if (mesh.normalsOrNull() != null) {
+            for (float v : mesh.normalsOrNull()) {
+                b.putFloat(v);
+            }
+        }
+        if (mesh.uv0OrNull() != null) {
+            for (float v : mesh.uv0OrNull()) {
+                b.putFloat(v);
+            }
         }
         return b.array();
     }
@@ -153,6 +182,91 @@ public final class MgiStaticMeshCodec {
         return b.array();
     }
 
+    private static List<AttributeSpec> decodeAttributeSchema(byte[] bytes, MgiChunkEntry entry) {
+        if ((entry.lengthBytes() % Integer.BYTES) != 0) {
+            throw new MgiValidationException("attribute schema chunk is not int-aligned");
+        }
+        ByteBuffer b = ByteBuffer.wrap(bytes, Math.toIntExact(entry.offsetBytes()), Math.toIntExact(entry.lengthBytes()))
+            .order(ByteOrder.LITTLE_ENDIAN);
+        if (b.remaining() < Integer.BYTES) {
+            throw new MgiValidationException("attribute schema chunk too small");
+        }
+
+        int count = b.getInt();
+        if (count <= 0) {
+            throw new MgiValidationException("attribute schema must contain at least one attribute");
+        }
+        if (b.remaining() != count * 4 * Integer.BYTES) {
+            throw new MgiValidationException("attribute schema length/count mismatch");
+        }
+
+        boolean hasPosition = false;
+        ArrayList<AttributeSpec> specs = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            int semantic = b.getInt();
+            int components = b.getInt();
+            int componentType = b.getInt();
+            int strideBytes = b.getInt();
+            AttributeSpec spec = new AttributeSpec(semantic, components, componentType, strideBytes);
+            if (semantic == SEM_POSITION) {
+                hasPosition = true;
+            }
+            specs.add(spec);
+        }
+
+        if (!hasPosition) {
+            throw new MgiValidationException("attribute schema missing POSITION");
+        }
+        return List.copyOf(specs);
+    }
+
+    private static DecodedStreams decodeVertexStreams(
+        byte[] bytes,
+        MgiChunkEntry entry,
+        List<AttributeSpec> specs,
+        int vertexCount
+    ) {
+        if ((entry.lengthBytes() % Float.BYTES) != 0) {
+            throw new MgiValidationException("vertex stream chunk is not float-aligned");
+        }
+        ByteBuffer b = ByteBuffer.wrap(bytes, Math.toIntExact(entry.offsetBytes()), Math.toIntExact(entry.lengthBytes()))
+            .order(ByteOrder.LITTLE_ENDIAN);
+
+        float[] positions = null;
+        float[] normals = null;
+        float[] uv0 = null;
+
+        for (AttributeSpec spec : specs) {
+            int floatCount = vertexCount * spec.components;
+            int byteCount = floatCount * Float.BYTES;
+            if (b.remaining() < byteCount) {
+                throw new MgiValidationException("vertex stream underflow for attribute semantic=" + spec.semanticId);
+            }
+
+            float[] values = new float[floatCount];
+            for (int i = 0; i < values.length; i++) {
+                values[i] = b.getFloat();
+            }
+
+            if (spec.semanticId == SEM_POSITION) {
+                positions = values;
+            } else if (spec.semanticId == SEM_NORMAL) {
+                normals = values;
+            } else if (spec.semanticId == SEM_UV0) {
+                uv0 = values;
+            }
+        }
+
+        if (b.hasRemaining()) {
+            throw new MgiValidationException("vertex stream chunk has unexpected trailing payload");
+        }
+        if (positions == null) {
+            throw new MgiValidationException("vertex stream missing POSITION payload");
+        }
+
+        return new DecodedStreams(positions, normals, uv0);
+    }
+
     private static int[] decodeIntPayload(byte[] bytes, MgiChunkEntry entry, int expectedCount) {
         if (entry.lengthBytes() != (long) expectedCount * Integer.BYTES) {
             throw new MgiValidationException("unexpected int payload size for chunk type=" + entry.type());
@@ -166,25 +280,24 @@ public final class MgiStaticMeshCodec {
         return out;
     }
 
-    private static float[] decodeFloatPayload(byte[] bytes, MgiChunkEntry entry, int expectedCount) {
-        if (entry.lengthBytes() != (long) expectedCount * Float.BYTES) {
-            throw new MgiValidationException("unexpected float payload size for chunk type=" + entry.type());
-        }
-        ByteBuffer b = ByteBuffer.wrap(bytes, Math.toIntExact(entry.offsetBytes()), Math.toIntExact(entry.lengthBytes()))
-            .order(ByteOrder.LITTLE_ENDIAN);
-        float[] out = new float[expectedCount];
-        for (int i = 0; i < out.length; i++) {
-            out[i] = b.getFloat();
-        }
-        return out;
-    }
-
     private static MgiChunkEntry required(Map<MgiChunkType, MgiChunkEntry> map, MgiChunkType type) {
         MgiChunkEntry entry = map.get(type);
         if (entry == null) {
             throw new MgiValidationException("missing required chunk: " + type);
         }
         return entry;
+    }
+
+    private static ArrayList<AttributeSpec> attributeSpecsFor(MgiStaticMesh mesh) {
+        ArrayList<AttributeSpec> specs = new ArrayList<>(3);
+        specs.add(new AttributeSpec(SEM_POSITION, 3, TYPE_FLOAT32, 12));
+        if (mesh.normalsOrNull() != null) {
+            specs.add(new AttributeSpec(SEM_NORMAL, 3, TYPE_FLOAT32, 12));
+        }
+        if (mesh.uv0OrNull() != null) {
+            specs.add(new AttributeSpec(SEM_UV0, 2, TYPE_FLOAT32, 8));
+        }
+        return specs;
     }
 
     private static void validateMesh(MgiStaticMesh mesh) {
@@ -201,5 +314,37 @@ public final class MgiStaticMeshCodec {
                 throw new MgiValidationException("submesh range exceeds index count");
             }
         }
+    }
+
+    private static final class AttributeSpec {
+        private final int semanticId;
+        private final int components;
+        private final int componentTypeId;
+        private final int strideBytes;
+
+        private AttributeSpec(int semanticId, int components, int componentTypeId, int strideBytes) {
+            this.semanticId = semanticId;
+            this.components = components;
+            this.componentTypeId = componentTypeId;
+            this.strideBytes = strideBytes;
+
+            if (componentTypeId != TYPE_FLOAT32) {
+                throw new MgiValidationException("unsupported component type id: " + componentTypeId);
+            }
+            if (semanticId == SEM_POSITION || semanticId == SEM_NORMAL) {
+                if (components != 3 || strideBytes != 12) {
+                    throw new MgiValidationException("invalid vec3 float32 layout for semantic=" + semanticId);
+                }
+            } else if (semanticId == SEM_UV0) {
+                if (components != 2 || strideBytes != 8) {
+                    throw new MgiValidationException("invalid vec2 float32 layout for semantic=UV0");
+                }
+            } else {
+                throw new MgiValidationException("unsupported semantic id: " + semanticId);
+            }
+        }
+    }
+
+    private record DecodedStreams(float[] positions, float[] normals, float[] uv0) {
     }
 }
