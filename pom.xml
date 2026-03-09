@@ -44,6 +44,7 @@
     <modules>
         <module>meshforge</module>
         <module>meshforge-loader</module>
+        <module>meshforge-mgi</module>
         <module>meshforge-dynamisgpu</module>
         <module>meshforge-demo</module>
     </modules>
