@@ -17,6 +17,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -72,7 +73,7 @@ class MgiMeshDataCodecTest {
     }
 
     @Test
-    void rejectsNonNumericMaterialId() {
+    void mapsNonNumericMaterialIdToStableIntegerSlots() throws Exception {
         VertexSchema schema = VertexSchema.builder()
             .add(AttributeSemantic.POSITION, 0, VertexFormat.F32x3)
             .build();
@@ -81,7 +82,11 @@ class MgiMeshDataCodecTest {
             schema,
             3,
             new int[] {0, 1, 2},
-            List.of(new Submesh(0, 3, "matA"))
+            List.of(
+                new Submesh(0, 3, "matA"),
+                new Submesh(0, 3, "matA"),
+                new Submesh(0, 3, "matB")
+            )
         );
         VertexAttributeView pos = mesh.attribute(AttributeSemantic.POSITION, 0);
         pos.set3f(0, 0f, 0f, 0f);
@@ -89,7 +94,15 @@ class MgiMeshDataCodecTest {
         pos.set3f(2, 0f, 1f, 0f);
 
         MgiMeshDataCodec codec = new MgiMeshDataCodec();
-        assertThrows(IllegalArgumentException.class, () -> codec.write(mesh));
+        MeshData read = codec.read(codec.write(mesh));
+
+        Object slotA0 = read.submeshes().get(0).materialId();
+        Object slotA1 = read.submeshes().get(1).materialId();
+        Object slotB = read.submeshes().get(2).materialId();
+        assertNotNull(slotA0);
+        assertNotNull(slotB);
+        assertEquals(slotA0, slotA1);
+        assertTrue(!slotA0.equals(slotB));
     }
 
     private static void assertAttrEquals(

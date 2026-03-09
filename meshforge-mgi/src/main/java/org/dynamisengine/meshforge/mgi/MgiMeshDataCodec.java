@@ -10,7 +10,9 @@ import org.dynamisengine.meshforge.core.topology.Topology;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Adapter between canonical MeshForge {@link MeshData} and MGI static mesh payload bytes.
@@ -145,9 +147,10 @@ public final class MgiMeshDataCodec {
             return List.of(new MgiSubmeshRange(0, indexCount, 0));
         }
 
+        Map<Object, Integer> materialSlots = new LinkedHashMap<>();
         ArrayList<MgiSubmeshRange> out = new ArrayList<>(source.size());
         for (Submesh submesh : source) {
-            int slot = materialSlot(submesh.materialId());
+            int slot = materialSlot(submesh.materialId(), materialSlots);
             long end = (long) submesh.firstIndex() + submesh.indexCount();
             if (submesh.firstIndex() < 0 || submesh.indexCount() < 0 || end > indexCount) {
                 throw new IllegalArgumentException("Submesh range exceeds index buffer: first=" + submesh.firstIndex()
@@ -158,7 +161,7 @@ public final class MgiMeshDataCodec {
         return List.copyOf(out);
     }
 
-    private static int materialSlot(Object materialId) {
+    private static int materialSlot(Object materialId, Map<Object, Integer> materialSlots) {
         if (materialId == null) {
             return 0;
         }
@@ -169,6 +172,12 @@ public final class MgiMeshDataCodec {
             }
             return slot;
         }
-        throw new IllegalArgumentException("materialId must be numeric or null for MGI v1");
+        Integer existing = materialSlots.get(materialId);
+        if (existing != null) {
+            return existing;
+        }
+        int created = materialSlots.size() + 1;
+        materialSlots.put(materialId, created);
+        return created;
     }
 }
