@@ -21,6 +21,29 @@ import java.util.Map;
  * Adapter between canonical MeshForge {@link MeshData} and MGI static mesh payload bytes.
  */
 public final class MgiMeshDataCodec {
+    /**
+     * Runtime decode bundle containing mesh payload and trust metadata hints.
+     *
+     * @param meshData decoded mesh data
+     * @param trustedCanonical trusted canonical metadata flag
+     * @param degenerateFree degenerate-free metadata flag
+     * @param hasPrebakedBounds whether bounds chunk was present
+     * @param metadataPresent whether canonical metadata was present
+     */
+    public record RuntimeDecodeResult(
+        MeshData meshData,
+        boolean trustedCanonical,
+        boolean degenerateFree,
+        boolean hasPrebakedBounds,
+        boolean metadataPresent
+    ) {
+        public RuntimeDecodeResult {
+            if (meshData == null) {
+                throw new NullPointerException("meshData");
+            }
+        }
+    }
+
     private final MgiStaticMeshCodec staticMeshCodec = new MgiStaticMeshCodec();
 
     public byte[] write(MeshData meshData) throws IOException {
@@ -31,10 +54,23 @@ public final class MgiMeshDataCodec {
     }
 
     public MeshData read(byte[] bytes) throws IOException {
+        return readForRuntime(bytes).meshData();
+    }
+
+    public RuntimeDecodeResult readForRuntime(byte[] bytes) throws IOException {
         if (bytes == null) {
             throw new NullPointerException("bytes");
         }
-        return toMeshData(staticMeshCodec.read(bytes));
+        MgiStaticMesh staticMesh = staticMeshCodec.read(bytes);
+        MeshData meshData = toMeshData(staticMesh);
+        MgiCanonicalMetadata metadata = staticMesh.canonicalMetadataOrNull();
+        return new RuntimeDecodeResult(
+            meshData,
+            metadata != null && metadata.trustedCanonical(),
+            metadata != null && metadata.degenerateFree(),
+            staticMesh.boundsOrNull() != null,
+            metadata != null
+        );
     }
 
     public static MgiStaticMesh toMgiStaticMesh(MeshData meshData) {

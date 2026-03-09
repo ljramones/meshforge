@@ -53,6 +53,7 @@ public final class Pipelines {
         private long normalsNs;
         private long tangentsNs;
         private long boundsNs;
+        private boolean trustedFastPathUsed;
 
         /**
          * Creates an empty profile.
@@ -70,6 +71,7 @@ public final class Pipelines {
             normalsNs = 0L;
             tangentsNs = 0L;
             boundsNs = 0L;
+            trustedFastPathUsed = false;
         }
 
         /**
@@ -119,6 +121,14 @@ public final class Pipelines {
         public long boundsNs() {
             return boundsNs;
         }
+
+        /**
+         * Returns whether trusted fast-path was used.
+         * @return resulting value
+         */
+        public boolean trustedFastPathUsed() {
+            return trustedFastPathUsed;
+        }
     }
 
     /**
@@ -138,6 +148,30 @@ public final class Pipelines {
     }
 
     /**
+     * Trusted-aware fast realtime prep pipeline.
+     *
+     * @param mesh source mesh
+     * @param trustPreprocessed whether trusted path is enabled
+     * @param trustedCanonical trusted canonical flag from metadata
+     * @param degenerateFree degenerate-free flag from metadata
+     * @param hasPrebakedBounds whether prebaked bounds are available
+     * @return processed mesh
+     */
+    public static MeshData realtimeFast(
+        MeshData mesh,
+        boolean trustPreprocessed,
+        boolean trustedCanonical,
+        boolean degenerateFree,
+        boolean hasPrebakedBounds
+    ) {
+        if (!shouldUseTrustedFastPath(trustPreprocessed, trustedCanonical, degenerateFree, hasPrebakedBounds)) {
+            return realtimeFast(mesh);
+        }
+        minimalTrustedSanityCheck(mesh, hasPrebakedBounds);
+        return runTrustedFast(mesh);
+    }
+
+    /**
      * Fast realtime prep pipeline with stage-level profile capture.
      *
      * @param mesh source mesh
@@ -145,6 +179,28 @@ public final class Pipelines {
      * @return processed mesh
      */
     public static MeshData realtimeFastProfiled(MeshData mesh, RuntimeStageProfile profile) {
+        return realtimeFastProfiled(mesh, profile, false, false, false, false);
+    }
+
+    /**
+     * Trusted-aware profiled fast realtime prep pipeline.
+     *
+     * @param mesh source mesh
+     * @param profile destination profile
+     * @param trustPreprocessed whether trusted path is enabled
+     * @param trustedCanonical trusted canonical flag from metadata
+     * @param degenerateFree degenerate-free flag from metadata
+     * @param hasPrebakedBounds whether prebaked bounds are available
+     * @return processed mesh
+     */
+    public static MeshData realtimeFastProfiled(
+        MeshData mesh,
+        RuntimeStageProfile profile,
+        boolean trustPreprocessed,
+        boolean trustedCanonical,
+        boolean degenerateFree,
+        boolean hasPrebakedBounds
+    ) {
         if (mesh == null) {
             throw new NullPointerException("mesh");
         }
@@ -153,6 +209,14 @@ public final class Pipelines {
         }
         profile.reset();
         long totalStart = System.nanoTime();
+
+        if (shouldUseTrustedFastPath(trustPreprocessed, trustedCanonical, degenerateFree, hasPrebakedBounds)) {
+            minimalTrustedSanityCheck(mesh, hasPrebakedBounds);
+            MeshData trusted = runTrustedFast(mesh);
+            profile.trustedFastPathUsed = true;
+            profile.totalNs = System.nanoTime() - totalStart;
+            return trusted;
+        }
 
         MeshContext context = new MeshContext();
         MeshData current = mesh;
@@ -224,6 +288,42 @@ public final class Pipelines {
         }
         ops.add(BOUNDS);
         return ops.toArray(MeshOp[]::new);
+    }
+
+    private static MeshData runTrustedFast(MeshData mesh) {
+        MeshContext context = new MeshContext();
+        MeshData current = mesh;
+        if (!current.has(AttributeSemantic.NORMAL, 0)) {
+            current = Ops.normals(180f).apply(current, context);
+        }
+        if (current.has(AttributeSemantic.UV, 0) && !current.has(AttributeSemantic.TANGENT, 0)) {
+            current = Ops.tangents().apply(current, context);
+        }
+        return current;
+    }
+
+    private static boolean shouldUseTrustedFastPath(
+        boolean trustPreprocessed,
+        boolean trustedCanonical,
+        boolean degenerateFree,
+        boolean hasPrebakedBounds
+    ) {
+        return trustPreprocessed && trustedCanonical && degenerateFree && hasPrebakedBounds;
+    }
+
+    private static void minimalTrustedSanityCheck(MeshData mesh, boolean hasPrebakedBounds) {
+        if (!mesh.has(AttributeSemantic.POSITION, 0)) {
+            throw new IllegalStateException("trusted fast path requires POSITION[0]");
+        }
+        if (mesh.indicesOrNull() == null) {
+            throw new IllegalStateException("trusted fast path requires indexed triangles");
+        }
+        if ((mesh.indicesOrNull().length % 3) != 0) {
+            throw new IllegalStateException("trusted fast path requires triangle index count divisible by 3");
+        }
+        if (!hasPrebakedBounds || mesh.boundsOrNull() == null) {
+            throw new IllegalStateException("trusted fast path requires prebaked bounds");
+        }
     }
 
     /**
