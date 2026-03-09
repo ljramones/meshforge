@@ -1,5 +1,9 @@
 package org.dynamisengine.meshforge.ops.cull.gpu;
 
+import org.dynamisengine.meshforge.ops.compress.gpu.CompressedRuntimePayload;
+import org.dynamisengine.meshforge.ops.compress.gpu.RuntimePayloadCompression;
+import org.dynamisengine.meshforge.ops.compress.gpu.RuntimePayloadCompressionMode;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
@@ -90,6 +94,17 @@ public record GpuMeshletVisibilityPayload(
         out.position(0);
         out.limit(boundsByteSize());
         return out;
+    }
+
+    /**
+     * Materializes optional compressed payload bytes while preserving canonical bounds semantics.
+     */
+    public CompressedRuntimePayload toCompressedBoundsPayload(RuntimePayloadCompressionMode mode) {
+        if (mode == null) {
+            throw new NullPointerException("mode");
+        }
+        byte[] compressed = RuntimePayloadCompression.compress(toBoundsByteBuffer(), mode);
+        return new CompressedRuntimePayload(mode, boundsByteSize(), compressed);
     }
 
     private static int expectedBoundsPayloadLengthFloats(int meshletCount, int offset, int stride) {

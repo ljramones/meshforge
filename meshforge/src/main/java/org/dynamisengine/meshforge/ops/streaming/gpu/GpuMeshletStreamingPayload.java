@@ -1,5 +1,9 @@
 package org.dynamisengine.meshforge.ops.streaming.gpu;
 
+import org.dynamisengine.meshforge.ops.compress.gpu.CompressedRuntimePayload;
+import org.dynamisengine.meshforge.ops.compress.gpu.RuntimePayloadCompression;
+import org.dynamisengine.meshforge.ops.compress.gpu.RuntimePayloadCompressionMode;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
@@ -77,6 +81,17 @@ public record GpuMeshletStreamingPayload(
         out.position(0);
         out.limit(unitsByteSize());
         return out;
+    }
+
+    /**
+     * Materializes optional compressed payload bytes while preserving canonical streaming semantics.
+     */
+    public CompressedRuntimePayload toCompressedUnitsPayload(RuntimePayloadCompressionMode mode) {
+        if (mode == null) {
+            throw new NullPointerException("mode");
+        }
+        byte[] compressed = RuntimePayloadCompression.compress(toUnitsByteBuffer(), mode);
+        return new CompressedRuntimePayload(mode, unitsByteSize(), compressed);
     }
 
     private static int expectedUnitsPayloadLengthInts(int unitCount, int offset, int stride) {
