@@ -30,6 +30,8 @@ Last updated: 2026-02-23
 
 ## Planning / History
 
+- `docs/meshforge-mgi-v1-design.md` - canonical MeshForge Geometry Ingest (MGI) v1 format design
+
 - `docs/roadmap.md` - active and next priorities
 - `docs/plan-v1.md` - historical v1 completion snapshot
 - `docs/release-notes-v1.0.0.md` - v1 release notes
