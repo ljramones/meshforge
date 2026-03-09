@@ -22,6 +22,7 @@ public final class MgiStaticMeshCodec {
     private static final int MESHLET_LOD_LEVEL_BYTES = (3 * Integer.BYTES) + Float.BYTES;
     private static final int MESHLET_STREAM_UNIT_INTS = 5;
     private static final int RT_REGION_INTS = 5;
+    private static final int TESSELLATION_REGION_BYTES = (5 * Integer.BYTES) + Float.BYTES;
 
     private static final int SEM_POSITION = 1;
     private static final int SEM_NORMAL = 2;
@@ -65,6 +66,9 @@ public final class MgiStaticMeshCodec {
         byte[] rtRegionBytes = mesh.rayTracingDataOrNull() == null
             ? null
             : encodeRayTracingRegions(mesh.rayTracingDataOrNull().regions());
+        byte[] tessellationRegionBytes = mesh.tessellationDataOrNull() == null
+            ? null
+            : encodeTessellationRegions(mesh.tessellationDataOrNull().regions());
 
         long directoryOffset = MgiConstants.HEADER_SIZE_BYTES;
         int chunkCount = 5;
@@ -84,6 +88,9 @@ public final class MgiStaticMeshCodec {
             chunkCount++;
         }
         if (rtRegionBytes != null) {
+            chunkCount++;
+        }
+        if (tessellationRegionBytes != null) {
             chunkCount++;
         }
         long payloadOffset = directoryOffset + ((long) chunkCount * MgiConstants.CHUNK_ENTRY_SIZE_BYTES);
@@ -191,6 +198,17 @@ public final class MgiStaticMeshCodec {
             entries.add(rtRegions);
             payloadOffset = rtRegions.endExclusive();
         }
+        MgiChunkEntry tessellationRegions = null;
+        if (tessellationRegionBytes != null) {
+            tessellationRegions = new MgiChunkEntry(
+                MgiChunkType.TESSELLATION_REGIONS.id(),
+                payloadOffset,
+                tessellationRegionBytes.length,
+                0
+            );
+            entries.add(tessellationRegions);
+            payloadOffset = tessellationRegions.endExclusive();
+        }
         MgiHeader header = MgiHeader.v1(entries.size(), directoryOffset, 1);
         long fileSize = payloadOffset;
         MgiValidator.validate(header, List.copyOf(entries), fileSize);
@@ -225,6 +243,9 @@ public final class MgiStaticMeshCodec {
         if (rtRegionBytes != null) {
             out.write(rtRegionBytes);
         }
+        if (tessellationRegionBytes != null) {
+            out.write(tessellationRegionBytes);
+        }
         return out.toByteArray();
     }
 
@@ -258,6 +279,7 @@ public final class MgiStaticMeshCodec {
         MgiChunkEntry meshletLodEntry = byType.get(MgiChunkType.MESHLET_LOD_LEVELS);
         MgiChunkEntry meshletStreamEntry = byType.get(MgiChunkType.MESHLET_STREAM_UNITS);
         MgiChunkEntry rtRegionsEntry = byType.get(MgiChunkType.RAY_TRACING_REGIONS);
+        MgiChunkEntry tessellationRegionsEntry = byType.get(MgiChunkType.TESSELLATION_REGIONS);
 
         int[] meshTable = decodeIntPayload(bytes, meshTableEntry, MESH_TABLE_ENTRY_INTS);
         int vertexCount = meshTable[0];
@@ -289,6 +311,7 @@ public final class MgiStaticMeshCodec {
         MgiMeshletLodData meshletLodData = decodeMeshletLodLevels(bytes, meshletLodEntry);
         MgiMeshletStreamingData meshletStreamingData = decodeMeshletStreamUnits(bytes, meshletStreamEntry);
         MgiRayTracingData rayTracingData = decodeRayTracingRegions(bytes, rtRegionsEntry);
+        MgiTessellationData tessellationData = decodeTessellationRegions(bytes, tessellationRegionsEntry);
 
         MgiStaticMesh mesh = new MgiStaticMesh(
             streams.positions,
@@ -300,6 +323,7 @@ public final class MgiStaticMeshCodec {
             meshletLodData,
             meshletStreamingData,
             rayTracingData,
+            tessellationData,
             indices,
             List.of(ranges)
         );
@@ -457,6 +481,20 @@ public final class MgiStaticMeshCodec {
             b.putInt(region.firstIndex());
             b.putInt(region.indexCount());
             b.putInt(region.materialSlot());
+            b.putInt(region.flags());
+        }
+        return b.array();
+    }
+
+    private static byte[] encodeTessellationRegions(List<MgiTessellationRegion> regions) {
+        ByteBuffer b = ByteBuffer.allocate(regions.size() * TESSELLATION_REGION_BYTES)
+            .order(ByteOrder.LITTLE_ENDIAN);
+        for (MgiTessellationRegion region : regions) {
+            b.putInt(region.submeshIndex());
+            b.putInt(region.firstIndex());
+            b.putInt(region.indexCount());
+            b.putInt(region.patchControlPoints());
+            b.putFloat(region.tessLevel());
             b.putInt(region.flags());
         }
         return b.array();
@@ -775,6 +813,33 @@ public final class MgiStaticMeshCodec {
         return new MgiRayTracingData(regions);
     }
 
+    private static MgiTessellationData decodeTessellationRegions(byte[] bytes, MgiChunkEntry entry) {
+        if (entry == null) {
+            return null;
+        }
+        if ((entry.lengthBytes() % TESSELLATION_REGION_BYTES) != 0) {
+            throw new MgiValidationException("invalid tessellation region payload size");
+        }
+        int regionCount = Math.toIntExact(entry.lengthBytes() / TESSELLATION_REGION_BYTES);
+        if (regionCount == 0) {
+            throw new MgiValidationException("tessellation region payload must not be empty");
+        }
+        ByteBuffer b = ByteBuffer.wrap(bytes, Math.toIntExact(entry.offsetBytes()), Math.toIntExact(entry.lengthBytes()))
+            .order(ByteOrder.LITTLE_ENDIAN);
+        ArrayList<MgiTessellationRegion> regions = new ArrayList<>(regionCount);
+        for (int i = 0; i < regionCount; i++) {
+            regions.add(new MgiTessellationRegion(
+                b.getInt(),
+                b.getInt(),
+                b.getInt(),
+                b.getInt(),
+                b.getFloat(),
+                b.getInt()
+            ));
+        }
+        return new MgiTessellationData(regions);
+    }
+
     private static MgiChunkEntry required(Map<MgiChunkType, MgiChunkEntry> map, MgiChunkType type) {
         MgiChunkEntry entry = map.get(type);
         if (entry == null) {
@@ -851,6 +916,18 @@ public final class MgiStaticMeshCodec {
                 long end = (long) region.firstIndex() + region.indexCount();
                 if (end > totalIndexCount) {
                     throw new MgiValidationException("ray tracing region range exceeds index count");
+                }
+            }
+        }
+        if (mesh.tessellationDataOrNull() != null) {
+            int submeshCount = mesh.submeshes().size();
+            for (MgiTessellationRegion region : mesh.tessellationDataOrNull().regions()) {
+                if (region.submeshIndex() >= submeshCount) {
+                    throw new MgiValidationException("tessellation region submesh index out of range");
+                }
+                long end = (long) region.firstIndex() + region.indexCount();
+                if (end > totalIndexCount) {
+                    throw new MgiValidationException("tessellation region range exceeds index count");
                 }
             }
         }

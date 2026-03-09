@@ -11,6 +11,8 @@ import org.dynamisengine.meshforge.core.mesh.MeshData;
 import org.dynamisengine.meshforge.core.mesh.Submesh;
 import org.dynamisengine.meshforge.ops.raytrace.RayTracingGeometryMetadata;
 import org.dynamisengine.meshforge.ops.raytrace.RayTracingGeometryRegionMetadata;
+import org.dynamisengine.meshforge.ops.tessellation.TessellationMetadata;
+import org.dynamisengine.meshforge.ops.tessellation.TessellationRegionMetadata;
 import org.dynamisengine.meshforge.core.topology.Topology;
 import org.dynamisengine.meshforge.ops.lod.MeshletLodLevelMetadata;
 import org.dynamisengine.meshforge.ops.lod.MeshletLodMetadata;
@@ -39,6 +41,7 @@ public final class MgiMeshDataCodec {
      * @param meshletLodDataOrNull optional decoded meshlet LOD metadata payload
      * @param meshletStreamingDataOrNull optional decoded meshlet streaming metadata payload
      * @param rayTracingDataOrNull optional decoded RT metadata payload
+     * @param tessellationDataOrNull optional decoded tessellation metadata payload
      */
     public record RuntimeDecodeResult(
         MeshData meshData,
@@ -49,7 +52,8 @@ public final class MgiMeshDataCodec {
         MgiMeshletData meshletDataOrNull,
         MgiMeshletLodData meshletLodDataOrNull,
         MgiMeshletStreamingData meshletStreamingDataOrNull,
-        MgiRayTracingData rayTracingDataOrNull
+        MgiRayTracingData rayTracingDataOrNull,
+        MgiTessellationData tessellationDataOrNull
     ) {
         public RuntimeDecodeResult {
             if (meshData == null) {
@@ -123,6 +127,25 @@ public final class MgiMeshDataCodec {
             }
             return new RayTracingGeometryMetadata(regions);
         }
+
+        public TessellationMetadata tessellationMetadataOrNull() {
+            if (tessellationDataOrNull == null) {
+                return null;
+            }
+            ArrayList<TessellationRegionMetadata> regions =
+                new ArrayList<>(tessellationDataOrNull.regions().size());
+            for (MgiTessellationRegion region : tessellationDataOrNull.regions()) {
+                regions.add(new TessellationRegionMetadata(
+                    region.submeshIndex(),
+                    region.firstIndex(),
+                    region.indexCount(),
+                    region.patchControlPoints(),
+                    region.tessLevel(),
+                    region.flags()
+                ));
+            }
+            return new TessellationMetadata(regions);
+        }
     }
 
     private final MgiStaticMeshCodec staticMeshCodec = new MgiStaticMeshCodec();
@@ -149,6 +172,7 @@ public final class MgiMeshDataCodec {
         MgiMeshletLodData meshletLodData = staticMesh.meshletLodDataOrNull();
         MgiMeshletStreamingData meshletStreamingData = staticMesh.meshletStreamingDataOrNull();
         MgiRayTracingData rayTracingData = staticMesh.rayTracingDataOrNull();
+        MgiTessellationData tessellationData = staticMesh.tessellationDataOrNull();
         return new RuntimeDecodeResult(
             meshData,
             metadata != null && metadata.trustedCanonical(),
@@ -158,7 +182,8 @@ public final class MgiMeshDataCodec {
             meshletData,
             meshletLodData,
             meshletStreamingData,
-            rayTracingData
+            rayTracingData,
+            tessellationData
         );
     }
 
@@ -197,6 +222,7 @@ public final class MgiMeshDataCodec {
         MgiAabb bounds = toMgiAabb(meshData);
         MgiCanonicalMetadata metadata = canonicalMetadata(meshData, packedPositions);
         MgiRayTracingData rayTracingData = canonicalRayTracingData(ranges);
+        MgiTessellationData tessellationData = canonicalTessellationData(ranges);
         return new MgiStaticMesh(
             packedPositions,
             packedNormals,
@@ -207,6 +233,7 @@ public final class MgiMeshDataCodec {
             null,
             null,
             rayTracingData,
+            tessellationData,
             indices,
             ranges
         );
@@ -377,6 +404,22 @@ public final class MgiMeshDataCodec {
             ));
         }
         return new MgiRayTracingData(regions);
+    }
+
+    private static MgiTessellationData canonicalTessellationData(List<MgiSubmeshRange> ranges) {
+        ArrayList<MgiTessellationRegion> regions = new ArrayList<>(ranges.size());
+        for (int i = 0; i < ranges.size(); i++) {
+            MgiSubmeshRange range = ranges.get(i);
+            regions.add(new MgiTessellationRegion(
+                i,
+                range.firstIndex(),
+                range.indexCount(),
+                3,
+                1.0f,
+                0
+            ));
+        }
+        return new MgiTessellationData(regions);
     }
 
     private static boolean isDegenerateFree(int[] indices, float[] positions) {

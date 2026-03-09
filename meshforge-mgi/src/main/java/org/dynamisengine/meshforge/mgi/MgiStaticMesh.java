@@ -14,6 +14,7 @@ import java.util.List;
  * @param meshletLodDataOrNull optional meshlet LOD metadata payload
  * @param meshletStreamingDataOrNull optional meshlet streaming metadata payload
  * @param rayTracingDataOrNull optional RT-relevant geometry metadata payload
+ * @param tessellationDataOrNull optional tessellation/subdivision metadata payload
  * @param indices triangle index buffer (uint32 domain)
  * @param submeshes submesh index ranges
  */
@@ -27,6 +28,7 @@ public record MgiStaticMesh(
     MgiMeshletLodData meshletLodDataOrNull,
     MgiMeshletStreamingData meshletStreamingDataOrNull,
     MgiRayTracingData rayTracingDataOrNull,
+    MgiTessellationData tessellationDataOrNull,
     int[] indices,
     List<MgiSubmeshRange> submeshes
 ) {
@@ -83,12 +85,47 @@ public record MgiStaticMesh(
         rayTracingDataOrNull = rayTracingDataOrNull == null ? null : new MgiRayTracingData(
             rayTracingDataOrNull.regions()
         );
+        tessellationDataOrNull = tessellationDataOrNull == null ? null : new MgiTessellationData(
+            tessellationDataOrNull.regions()
+        );
         indices = indices.clone();
         submeshes = List.copyOf(submeshes);
     }
 
     /**
      * Backward-compatible constructor for pre-RT MGI static mesh construction paths.
+     */
+    public MgiStaticMesh(
+        float[] positions,
+        float[] normalsOrNull,
+        float[] uv0OrNull,
+        MgiAabb boundsOrNull,
+        MgiCanonicalMetadata canonicalMetadataOrNull,
+        MgiMeshletData meshletDataOrNull,
+        MgiMeshletLodData meshletLodDataOrNull,
+        MgiMeshletStreamingData meshletStreamingDataOrNull,
+        MgiRayTracingData rayTracingDataOrNull,
+        int[] indices,
+        List<MgiSubmeshRange> submeshes
+    ) {
+        this(
+            positions,
+            normalsOrNull,
+            uv0OrNull,
+            boundsOrNull,
+            canonicalMetadataOrNull,
+            meshletDataOrNull,
+            meshletLodDataOrNull,
+            meshletStreamingDataOrNull,
+            rayTracingDataOrNull,
+            null,
+            indices,
+            submeshes
+        );
+    }
+
+    /**
+     * Backward-compatible constructor for pre-RT and pre-tessellation MGI static mesh construction paths.
      */
     public MgiStaticMesh(
         float[] positions,
@@ -111,6 +148,7 @@ public record MgiStaticMesh(
             meshletDataOrNull,
             meshletLodDataOrNull,
             meshletStreamingDataOrNull,
+            null,
             null,
             indices,
             submeshes

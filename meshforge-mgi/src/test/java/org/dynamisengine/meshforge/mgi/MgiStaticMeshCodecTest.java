@@ -160,6 +160,41 @@ class MgiStaticMeshCodecTest {
     }
 
     @Test
+    void roundTripsOptionalTessellationRegionsChunk() throws Exception {
+        MgiStaticMesh input = new MgiStaticMesh(
+            new float[] {
+                0f, 0f, 0f,
+                1f, 0f, 0f,
+                0f, 1f, 0f,
+                1f, 1f, 0f
+            },
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            new MgiTessellationData(List.of(
+                new MgiTessellationRegion(0, 0, 3, 3, 1.0f, 0),
+                new MgiTessellationRegion(1, 3, 3, 4, 2.0f, 2)
+            )),
+            new int[] {0, 1, 2, 1, 3, 2},
+            List.of(
+                new MgiSubmeshRange(0, 3, 0),
+                new MgiSubmeshRange(3, 3, 2)
+            )
+        );
+
+        MgiStaticMeshCodec codec = new MgiStaticMeshCodec();
+        byte[] bytes = codec.write(input);
+        MgiStaticMesh output = codec.read(bytes);
+
+        assertEquals(input.tessellationDataOrNull(), output.tessellationDataOrNull());
+    }
+
+    @Test
     void rejectsOutOfRangeIndexOnWrite() {
         MgiStaticMesh invalid = new MgiStaticMesh(
             new float[] {
