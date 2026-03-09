@@ -16,10 +16,13 @@ import org.dynamisengine.meshforge.pack.buffer.PackedMesh;
 import org.dynamisengine.meshforge.pack.packer.MeshPacker;
 import org.junit.jupiter.api.Test;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -123,6 +126,85 @@ class MgiMeshDataCodecTest {
         assertNotNull(slotB);
         assertEquals(slotA0, slotA1);
         assertTrue(!slotA0.equals(slotB));
+    }
+
+    @Test
+    void runtimeDecodeExposesMeshletMetadataWhenPresent() throws Exception {
+        MgiStaticMesh staticMesh = new MgiStaticMesh(
+            new float[] {
+                0f, 0f, 0f,
+                1f, 0f, 0f,
+                0f, 1f, 0f,
+                0f, 0f, 1f
+            },
+            null,
+            null,
+            null,
+            null,
+            new MgiMeshletData(
+                List.of(new MgiMeshletDescriptor(0, 0, 0, 4, 0, 2, 0, 0)),
+                new int[] {0, 1, 2, 3},
+                new int[] {0, 1, 2, 0, 2, 3},
+                List.of(new MgiMeshletBounds(0f, 0f, 0f, 1f, 1f, 1f))
+            ),
+            new int[] {0, 1, 2, 0, 2, 3},
+            List.of(new MgiSubmeshRange(0, 6, 0))
+        );
+
+        byte[] bytes = new MgiStaticMeshCodec().write(staticMesh);
+        MgiMeshDataCodec codec = new MgiMeshDataCodec();
+        MgiMeshDataCodec.RuntimeDecodeResult decoded = codec.readForRuntime(bytes);
+
+        assertTrue(decoded.meshletDataPresent());
+        assertEquals(1, decoded.meshletDescriptorCount());
+        assertNotNull(decoded.meshletDataOrNull());
+        assertArrayEquals(new int[] {0, 1, 2, 3}, decoded.meshletDataOrNull().vertexRemap());
+        assertArrayEquals(new int[] {0, 1, 2, 0, 2, 3}, decoded.meshletDataOrNull().triangles());
+    }
+
+    @Test
+    void runtimeDecodeWithoutMeshletsPreservesClassicPath() throws Exception {
+        MeshData input = sampleTriangleMeshWithNormalsUv();
+        MgiMeshDataCodec codec = new MgiMeshDataCodec();
+        MgiMeshDataCodec.RuntimeDecodeResult decoded = codec.readForRuntime(codec.write(input));
+
+        assertFalse(decoded.meshletDataPresent());
+        assertEquals(0, decoded.meshletDescriptorCount());
+        assertEquals(input.vertexCount(), decoded.meshData().vertexCount());
+    }
+
+    @Test
+    void runtimeDecodeRejectsMalformedMeshletMetadata() throws Exception {
+        MgiStaticMesh staticMesh = new MgiStaticMesh(
+            new float[] {
+                0f, 0f, 0f,
+                1f, 0f, 0f,
+                0f, 1f, 0f,
+                0f, 0f, 1f
+            },
+            null,
+            null,
+            null,
+            null,
+            new MgiMeshletData(
+                List.of(new MgiMeshletDescriptor(0, 0, 0, 4, 0, 2, 0, 0)),
+                new int[] {0, 1, 2, 3},
+                new int[] {0, 1, 2, 0, 2, 3},
+                List.of(new MgiMeshletBounds(0f, 0f, 0f, 1f, 1f, 1f))
+            ),
+            new int[] {0, 1, 2, 0, 2, 3},
+            List.of(new MgiSubmeshRange(0, 6, 0))
+        );
+
+        byte[] bytes = new MgiStaticMeshCodec().write(staticMesh);
+        int descriptorLengthOffset = MgiConstants.HEADER_SIZE_BYTES
+            + (5 * MgiConstants.CHUNK_ENTRY_SIZE_BYTES)
+            + 16;
+        ByteBuffer patch = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
+        patch.putLong(descriptorLengthOffset, (long) (7 * Integer.BYTES));
+
+        MgiMeshDataCodec codec = new MgiMeshDataCodec();
+        assertThrows(MgiValidationException.class, () -> codec.readForRuntime(bytes));
     }
 
     private static void assertAttrEquals(

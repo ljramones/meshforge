@@ -29,18 +29,28 @@ public final class MgiMeshDataCodec {
      * @param degenerateFree degenerate-free metadata flag
      * @param hasPrebakedBounds whether bounds chunk was present
      * @param metadataPresent whether canonical metadata was present
+     * @param meshletDataOrNull optional decoded meshlet metadata payload
      */
     public record RuntimeDecodeResult(
         MeshData meshData,
         boolean trustedCanonical,
         boolean degenerateFree,
         boolean hasPrebakedBounds,
-        boolean metadataPresent
+        boolean metadataPresent,
+        MgiMeshletData meshletDataOrNull
     ) {
         public RuntimeDecodeResult {
             if (meshData == null) {
                 throw new NullPointerException("meshData");
             }
+        }
+
+        public boolean meshletDataPresent() {
+            return meshletDataOrNull != null;
+        }
+
+        public int meshletDescriptorCount() {
+            return meshletDataOrNull == null ? 0 : meshletDataOrNull.descriptors().size();
         }
     }
 
@@ -64,12 +74,14 @@ public final class MgiMeshDataCodec {
         MgiStaticMesh staticMesh = staticMeshCodec.read(bytes);
         MeshData meshData = toMeshData(staticMesh);
         MgiCanonicalMetadata metadata = staticMesh.canonicalMetadataOrNull();
+        MgiMeshletData meshletData = staticMesh.meshletDataOrNull();
         return new RuntimeDecodeResult(
             meshData,
             metadata != null && metadata.trustedCanonical(),
             metadata != null && metadata.degenerateFree(),
             staticMesh.boundsOrNull() != null,
-            metadata != null
+            metadata != null,
+            meshletData
         );
     }
 
