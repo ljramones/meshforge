@@ -2,7 +2,11 @@ package org.dynamisengine.meshforge.demo;
 
 import org.dynamisengine.meshforge.api.Packers;
 import org.dynamisengine.meshforge.api.Pipelines;
+import org.dynamisengine.meshforge.core.attr.AttributeKey;
+import org.dynamisengine.meshforge.core.attr.VertexAttributeView;
+import org.dynamisengine.meshforge.core.attr.VertexFormat;
 import org.dynamisengine.meshforge.core.mesh.MeshData;
+import org.dynamisengine.meshforge.core.mesh.Submesh;
 import org.dynamisengine.meshforge.gpu.GpuGeometryUploadPlan;
 import org.dynamisengine.meshforge.gpu.MeshForgeGpuBridge;
 import org.dynamisengine.meshforge.gpu.RuntimeGeometryPayload;
@@ -17,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -41,6 +46,7 @@ public final class PrepQueueTransferTtfuFixtureTiming {
         int warmup = DEFAULT_WARMUP;
         int runs = DEFAULT_RUNS;
         int maxInflight = DEFAULT_INFLIGHT;
+        Mode mode = Mode.BOTH;
 
         for (String arg : args) {
             if (arg.startsWith("--fixture=")) {
@@ -51,6 +57,8 @@ public final class PrepQueueTransferTtfuFixtureTiming {
                 runs = parsePositive(arg.substring("--runs=".length()), "runs");
             } else if (arg.startsWith("--max-inflight=")) {
                 maxInflight = parsePositive(arg.substring("--max-inflight=".length()), "max-inflight");
+            } else if (arg.startsWith("--mode=")) {
+                mode = parseMode(arg.substring("--mode=".length()));
             }
         }
 
@@ -76,19 +84,28 @@ public final class PrepQueueTransferTtfuFixtureTiming {
         MeshLoaders loaders = MeshLoaders.defaultsFast();
         PackSpec spec = Packers.realtime();
 
-        System.out.println("prep+queue+transfer timing (median + p95)");
-        System.out.printf(Locale.ROOT, "warmup=%d runs=%d maxInflight=%d%n", warmup, runs, maxInflight);
-        System.out.println();
-        System.out.println("| Fixture | Load ms | Pipeline ms | Plan ms | Pack ms | Bridge ms | Queue ms | Transfer ms | Total TTFU ms | Triangles | Upload Bytes | ");
-        System.out.println("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
-
+        List<Row> rows = new ArrayList<>();
         for (Path fixture : fixtures) {
-            Row row = measureFixture(loaders, spec, fixture, warmup, runs, maxInflight);
+            if (mode == Mode.FULL || mode == Mode.BOTH) {
+                rows.add(measureFixture(loaders, spec, fixture, warmup, runs, maxInflight, Mode.FULL));
+            }
+            if (mode == Mode.RUNTIME_ONLY || mode == Mode.BOTH) {
+                rows.add(measureFixture(loaders, spec, fixture, warmup, runs, maxInflight, Mode.RUNTIME_ONLY));
+            }
+        }
+
+        System.out.println("prep+queue+transfer timing (median + p95)");
+        System.out.printf(Locale.ROOT, "warmup=%d runs=%d maxInflight=%d mode=%s%n", warmup, runs, maxInflight, mode.label);
+        System.out.println();
+        System.out.println("| Fixture | Mode | Load/Clone ms | Pipeline ms | Plan ms | Pack ms | Bridge ms | Queue ms | Transfer ms | Total TTFU ms | Triangles | Upload Bytes |");
+        System.out.println("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+        for (Row row : rows) {
             System.out.printf(
                 Locale.ROOT,
-                "| `%s` | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %d | %d |%n",
+                "| `%s` | %s | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %d | %d |%n",
                 row.name,
-                row.loadMedianMs,
+                row.mode,
+                row.loadOrCloneMedianMs,
                 row.pipelineMedianMs,
                 row.planMedianMs,
                 row.packMedianMs,
@@ -103,15 +120,15 @@ public final class PrepQueueTransferTtfuFixtureTiming {
 
         System.out.println();
         System.out.println("p95 breakdown");
-        System.out.println("| Fixture | Load p95 | Pipeline p95 | Plan p95 | Pack p95 | Bridge p95 | Queue p95 | Transfer p95 | Total TTFU p95 |");
-        System.out.println("|---|---:|---:|---:|---:|---:|---:|---:|---:|");
-        for (Path fixture : fixtures) {
-            Row row = measureFixture(loaders, spec, fixture, warmup, runs, maxInflight);
+        System.out.println("| Fixture | Mode | Load/Clone p95 | Pipeline p95 | Plan p95 | Pack p95 | Bridge p95 | Queue p95 | Transfer p95 | Total TTFU p95 |");
+        System.out.println("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|");
+        for (Row row : rows) {
             System.out.printf(
                 Locale.ROOT,
-                "| `%s` | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f |%n",
+                "| `%s` | %s | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f |%n",
                 row.name,
-                row.loadP95Ms,
+                row.mode,
+                row.loadOrCloneP95Ms,
                 row.pipelineP95Ms,
                 row.planP95Ms,
                 row.packP95Ms,
@@ -129,15 +146,15 @@ public final class PrepQueueTransferTtfuFixtureTiming {
         Path fixture,
         int warmup,
         int runs,
-        int maxInflight
+        int maxInflight,
+        Mode mode
     ) throws Exception {
         int total = warmup + runs;
-        List<Long> loadNs = new ArrayList<>(runs);
+        List<Long> loadOrCloneNs = new ArrayList<>(runs);
         List<Long> pipelineNs = new ArrayList<>(runs);
         List<Long> planNs = new ArrayList<>(runs);
         List<Long> packNs = new ArrayList<>(runs);
         List<Long> bridgeNs = new ArrayList<>(runs);
-        List<Long> prepNs = new ArrayList<>(runs);
         List<Long> queueNs = new ArrayList<>(runs);
         List<Long> transferNs = new ArrayList<>(runs);
         List<Long> totalNs = new ArrayList<>(runs);
@@ -145,11 +162,22 @@ public final class PrepQueueTransferTtfuFixtureTiming {
         int triangles = 0;
         int uploadBytes = 0;
 
+        MeshData baseline = null;
+        if (mode == Mode.RUNTIME_ONLY) {
+            baseline = loaders.load(fixture);
+        }
+
         try (AsyncUploadSimulator uploader = new AsyncUploadSimulator(maxInflight)) {
             for (int i = 0; i < total; i++) {
                 long t0 = System.nanoTime();
-                MeshData loaded = loaders.load(fixture);
-                long tLoad = System.nanoTime();
+
+                MeshData loaded;
+                if (mode == Mode.FULL) {
+                    loaded = loaders.load(fixture);
+                } else {
+                    loaded = copyOf(baseline);
+                }
+                long tLoadOrClone = System.nanoTime();
 
                 MeshData processed = Pipelines.realtimeFast(loaded);
                 long tPipeline = System.nanoTime();
@@ -170,12 +198,11 @@ public final class PrepQueueTransferTtfuFixtureTiming {
                 TransferTiming timing = pending.await();
 
                 if (i >= warmup) {
-                    loadNs.add(tLoad - t0);
-                    pipelineNs.add(tPipeline - tLoad);
+                    loadOrCloneNs.add(tLoadOrClone - t0);
+                    pipelineNs.add(tPipeline - tLoadOrClone);
                     planNs.add(tPlan - tPipeline);
                     packNs.add(tPack - tPlan);
                     bridgeNs.add(t1 - tPack);
-                    prepNs.add(timing.prepNanos());
                     queueNs.add(timing.queueWaitNanos());
                     transferNs.add(timing.transferNanos());
                     totalNs.add(timing.totalTtfuNanos());
@@ -191,35 +218,18 @@ public final class PrepQueueTransferTtfuFixtureTiming {
             }
         }
 
-        long prepMedian = median(prepNs);
-        long loadMedian = median(loadNs);
-        long pipelineMedian = median(pipelineNs);
-        long planMedian = median(planNs);
-        long packMedian = median(packNs);
-        long bridgeMedian = median(bridgeNs);
-
-        long sumSubPrepMedian = loadMedian + pipelineMedian + planMedian + packMedian + bridgeMedian;
-        if (Math.abs(prepMedian - sumSubPrepMedian) > 2_000_000L) {
-            System.out.printf(
-                Locale.ROOT,
-                "note=%s prep_median_mismatch_ms=%.3f subprep_ms=%.3f%n",
-                fixture.getFileName(),
-                toMs(prepMedian),
-                toMs(sumSubPrepMedian)
-            );
-        }
-
         return new Row(
             fixture.getFileName().toString(),
-            toMs(loadMedian),
-            toMs(p95(loadNs)),
-            toMs(pipelineMedian),
+            mode.label,
+            toMs(median(loadOrCloneNs)),
+            toMs(p95(loadOrCloneNs)),
+            toMs(median(pipelineNs)),
             toMs(p95(pipelineNs)),
-            toMs(planMedian),
+            toMs(median(planNs)),
             toMs(p95(planNs)),
-            toMs(packMedian),
+            toMs(median(packNs)),
             toMs(p95(packNs)),
-            toMs(bridgeMedian),
+            toMs(median(bridgeNs)),
             toMs(p95(bridgeNs)),
             toMs(median(queueNs)),
             toMs(p95(queueNs)),
@@ -230,6 +240,51 @@ public final class PrepQueueTransferTtfuFixtureTiming {
             triangles,
             uploadBytes
         );
+    }
+
+    private static MeshData copyOf(MeshData src) {
+        int[] indices = src.indicesOrNull();
+        List<Submesh> copiedSubmeshes = new ArrayList<>(src.submeshes());
+        MeshData dst = new MeshData(
+            src.topology(),
+            src.schema(),
+            src.vertexCount(),
+            indices == null ? null : indices.clone(),
+            copiedSubmeshes
+        );
+
+        for (Map.Entry<AttributeKey, VertexFormat> entry : src.attributeFormats().entrySet()) {
+            AttributeKey key = entry.getKey();
+            VertexFormat format = entry.getValue();
+            VertexAttributeView in = src.attribute(key.semantic(), key.setIndex());
+            VertexAttributeView out = dst.attribute(key.semantic(), key.setIndex());
+            copyAttribute(in, out, format);
+        }
+
+        dst.setBounds(src.boundsOrNull());
+        dst.setMorphTargets(src.morphTargets());
+        return dst;
+    }
+
+    private static void copyAttribute(VertexAttributeView in, VertexAttributeView out, VertexFormat format) {
+        int vc = in.vertexCount();
+        int comps = format.components();
+        switch (format.kind()) {
+            case FLOAT -> {
+                for (int i = 0; i < vc; i++) {
+                    for (int c = 0; c < comps; c++) {
+                        out.setFloat(i, c, in.getFloat(i, c));
+                    }
+                }
+            }
+            case INT, SHORT, BYTE -> {
+                for (int i = 0; i < vc; i++) {
+                    for (int c = 0; c < comps; c++) {
+                        out.setInt(i, c, in.getInt(i, c));
+                    }
+                }
+            }
+        }
     }
 
     private static int simulateTransfer(RuntimeGeometryPayload payload, GpuGeometryUploadPlan plan) {
@@ -275,21 +330,31 @@ public final class PrepQueueTransferTtfuFixtureTiming {
         return parsed;
     }
 
+    private static Mode parseMode(String raw) {
+        return switch (raw.trim().toLowerCase(Locale.ROOT)) {
+            case "full" -> Mode.FULL;
+            case "runtime-only" -> Mode.RUNTIME_ONLY;
+            case "both" -> Mode.BOTH;
+            default -> throw new IllegalArgumentException("--mode must be full|runtime-only|both");
+        };
+    }
+
     private record PendingTransfer(long t0, long t1, long t2, CompletableFuture<Integer> transferFuture) {
         private TransferTiming await() throws Exception {
             transferFuture.get();
             long t3 = System.nanoTime();
-            return new TransferTiming(t1 - t0, t2 - t1, t3 - t2, t3 - t0);
+            return new TransferTiming(t2 - t1, t3 - t2, t3 - t0);
         }
     }
 
-    private record TransferTiming(long prepNanos, long queueWaitNanos, long transferNanos, long totalTtfuNanos) {
+    private record TransferTiming(long queueWaitNanos, long transferNanos, long totalTtfuNanos) {
     }
 
     private record Row(
         String name,
-        double loadMedianMs,
-        double loadP95Ms,
+        String mode,
+        double loadOrCloneMedianMs,
+        double loadOrCloneP95Ms,
         double pipelineMedianMs,
         double pipelineP95Ms,
         double planMedianMs,
@@ -307,6 +372,18 @@ public final class PrepQueueTransferTtfuFixtureTiming {
         int triangles,
         int uploadBytes
     ) {
+    }
+
+    private enum Mode {
+        FULL("full"),
+        RUNTIME_ONLY("runtime-only"),
+        BOTH("both");
+
+        private final String label;
+
+        Mode(String label) {
+            this.label = label;
+        }
     }
 
     private static final class AsyncUploadSimulator implements AutoCloseable {
