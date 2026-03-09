@@ -4,6 +4,9 @@ import org.dynamisengine.meshforge.core.attr.AttributeSemantic;
 import org.dynamisengine.meshforge.core.attr.VertexAttributeView;
 import org.dynamisengine.meshforge.core.attr.VertexFormat;
 import org.dynamisengine.meshforge.core.attr.VertexSchema;
+import org.dynamisengine.meshforge.core.bounds.Aabbf;
+import org.dynamisengine.meshforge.core.bounds.Boundsf;
+import org.dynamisengine.meshforge.core.bounds.Spheref;
 import org.dynamisengine.meshforge.core.mesh.MeshData;
 import org.dynamisengine.meshforge.core.mesh.Submesh;
 import org.dynamisengine.meshforge.core.topology.Topology;
@@ -66,7 +69,8 @@ public final class MgiMeshDataCodec {
         float[] packedNormals = normals == null ? null : extractF32(normals, 3);
         float[] packedUv0 = uv0 == null ? null : extractF32(uv0, 2);
         List<MgiSubmeshRange> ranges = convertSubmeshes(meshData.submeshes(), indices.length);
-        return new MgiStaticMesh(packedPositions, packedNormals, packedUv0, indices, ranges);
+        MgiAabb bounds = toMgiAabb(meshData);
+        return new MgiStaticMesh(packedPositions, packedNormals, packedUv0, bounds, indices, ranges);
     }
 
     public static MeshData toMeshData(MgiStaticMesh mesh) {
@@ -102,6 +106,9 @@ public final class MgiMeshDataCodec {
         }
         if (mesh.uv0OrNull() != null) {
             writeAttribute(data.attribute(AttributeSemantic.UV, 0), mesh.uv0OrNull(), 2);
+        }
+        if (mesh.boundsOrNull() != null) {
+            data.setBounds(toBoundsf(mesh.boundsOrNull()));
         }
         return data;
     }
@@ -179,5 +186,28 @@ public final class MgiMeshDataCodec {
         int created = materialSlots.size() + 1;
         materialSlots.put(materialId, created);
         return created;
+    }
+
+    private static MgiAabb toMgiAabb(MeshData meshData) {
+        Boundsf bounds = meshData.boundsOrNull();
+        if (bounds == null || bounds.aabb() == null) {
+            return null;
+        }
+        Aabbf aabb = bounds.aabb();
+        return new MgiAabb(aabb.minX(), aabb.minY(), aabb.minZ(), aabb.maxX(), aabb.maxY(), aabb.maxZ());
+    }
+
+    private static Boundsf toBoundsf(MgiAabb aabb) {
+        float centerX = (aabb.minX() + aabb.maxX()) * 0.5f;
+        float centerY = (aabb.minY() + aabb.maxY()) * 0.5f;
+        float centerZ = (aabb.minZ() + aabb.maxZ()) * 0.5f;
+        float dx = aabb.maxX() - centerX;
+        float dy = aabb.maxY() - centerY;
+        float dz = aabb.maxZ() - centerZ;
+        float radius = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+        return new Boundsf(
+            new Aabbf(aabb.minX(), aabb.minY(), aabb.minZ(), aabb.maxX(), aabb.maxY(), aabb.maxZ()),
+            new Spheref(centerX, centerY, centerZ, radius)
+        );
     }
 }

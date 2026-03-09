@@ -8,6 +8,7 @@ import java.util.List;
  * @param positions xyz float triplets (length = vertexCount * 3)
  * @param normalsOrNull optional xyz normal triplets (length = vertexCount * 3)
  * @param uv0OrNull optional uv pairs (length = vertexCount * 2)
+ * @param boundsOrNull optional prebaked bounds payload
  * @param indices triangle index buffer (uint32 domain)
  * @param submeshes submesh index ranges
  */
@@ -15,6 +16,7 @@ public record MgiStaticMesh(
     float[] positions,
     float[] normalsOrNull,
     float[] uv0OrNull,
+    MgiAabb boundsOrNull,
     int[] indices,
     List<MgiSubmeshRange> submeshes
 ) {
@@ -43,6 +45,14 @@ public record MgiStaticMesh(
         positions = positions.clone();
         normalsOrNull = normalsOrNull == null ? null : normalsOrNull.clone();
         uv0OrNull = uv0OrNull == null ? null : uv0OrNull.clone();
+        boundsOrNull = boundsOrNull == null ? null : new MgiAabb(
+            boundsOrNull.minX(),
+            boundsOrNull.minY(),
+            boundsOrNull.minZ(),
+            boundsOrNull.maxX(),
+            boundsOrNull.maxY(),
+            boundsOrNull.maxZ()
+        );
         indices = indices.clone();
         submeshes = List.copyOf(submeshes);
     }

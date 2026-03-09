@@ -6,6 +6,9 @@ import org.dynamisengine.meshforge.core.attr.AttributeSemantic;
 import org.dynamisengine.meshforge.core.attr.VertexAttributeView;
 import org.dynamisengine.meshforge.core.attr.VertexFormat;
 import org.dynamisengine.meshforge.core.attr.VertexSchema;
+import org.dynamisengine.meshforge.core.bounds.Aabbf;
+import org.dynamisengine.meshforge.core.bounds.Boundsf;
+import org.dynamisengine.meshforge.core.bounds.Spheref;
 import org.dynamisengine.meshforge.core.mesh.MeshData;
 import org.dynamisengine.meshforge.core.mesh.Submesh;
 import org.dynamisengine.meshforge.core.topology.Topology;
@@ -17,6 +20,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -39,6 +43,15 @@ class MgiMeshDataCodecTest {
         assertAttrEquals(input, output, AttributeSemantic.POSITION, 0, 3);
         assertAttrEquals(input, output, AttributeSemantic.NORMAL, 0, 3);
         assertAttrEquals(input, output, AttributeSemantic.UV, 0, 2);
+        assertNotNull(output.boundsOrNull());
+        assertNotNull(output.boundsOrNull().aabb());
+        assertEquals(0f, output.boundsOrNull().aabb().minX());
+        assertEquals(0f, output.boundsOrNull().aabb().minY());
+        assertEquals(0f, output.boundsOrNull().aabb().minZ());
+        assertEquals(1f, output.boundsOrNull().aabb().maxX());
+        assertEquals(1f, output.boundsOrNull().aabb().maxY());
+        assertEquals(0f, output.boundsOrNull().aabb().maxZ());
+        assertNotEquals(0f, output.boundsOrNull().sphere().radius());
     }
 
     @Test
@@ -152,6 +165,10 @@ class MgiMeshDataCodecTest {
         uv.set2f(1, 1f, 0f);
         uv.set2f(2, 0f, 1f);
         uv.set2f(3, 1f, 1f);
+        mesh.setBounds(new Boundsf(
+            new Aabbf(0f, 0f, 0f, 1f, 1f, 0f),
+            new Spheref(0.5f, 0.5f, 0f, (float) Math.sqrt(0.5f))
+        ));
         return mesh;
     }
 }

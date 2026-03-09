@@ -15,6 +15,7 @@ import java.util.Map;
 public final class MgiStaticMeshCodec {
     private static final int MESH_TABLE_ENTRY_INTS = 4;
     private static final int SUBMESH_ENTRY_INTS = 4;
+    private static final int BOUNDS_FLOATS = 6;
 
     private static final int SEM_POSITION = 1;
     private static final int SEM_NORMAL = 2;
@@ -33,9 +34,10 @@ public final class MgiStaticMeshCodec {
         byte[] vertexBytes = encodeVertexStreams(mesh);
         byte[] indexBytes = encodeIndices(mesh.indices());
         byte[] submeshBytes = encodeSubmeshes(mesh.submeshes());
+        byte[] boundsBytes = mesh.boundsOrNull() == null ? null : encodeBounds(mesh.boundsOrNull());
 
         long directoryOffset = MgiConstants.HEADER_SIZE_BYTES;
-        int chunkCount = 5;
+        int chunkCount = boundsBytes == null ? 5 : 6;
         long payloadOffset = directoryOffset + ((long) chunkCount * MgiConstants.CHUNK_ENTRY_SIZE_BYTES);
 
         MgiChunkEntry meshTable = new MgiChunkEntry(MgiChunkType.MESH_TABLE.id(), payloadOffset, meshTableBytes.length, 0);
@@ -47,12 +49,21 @@ public final class MgiStaticMeshCodec {
         MgiChunkEntry indices = new MgiChunkEntry(MgiChunkType.INDEX_DATA.id(), payloadOffset, indexBytes.length, 0);
         payloadOffset = indices.endExclusive();
         MgiChunkEntry submeshes = new MgiChunkEntry(MgiChunkType.SUBMESH_TABLE.id(), payloadOffset, submeshBytes.length, 0);
+        payloadOffset = submeshes.endExclusive();
 
-        List<MgiChunkEntry> entries = List.of(meshTable, attrSchema, vertices, indices, submeshes);
+        List<MgiChunkEntry> entries;
+        MgiChunkEntry bounds = null;
+        if (boundsBytes == null) {
+            entries = List.of(meshTable, attrSchema, vertices, indices, submeshes);
+        } else {
+            bounds = new MgiChunkEntry(MgiChunkType.BOUNDS.id(), payloadOffset, boundsBytes.length, 0);
+            entries = List.of(meshTable, attrSchema, vertices, indices, submeshes, bounds);
+        }
         MgiHeader header = MgiHeader.v1(entries.size(), directoryOffset, 1);
-        MgiValidator.validate(header, entries, submeshes.endExclusive());
+        long fileSize = bounds == null ? submeshes.endExclusive() : bounds.endExclusive();
+        MgiValidator.validate(header, entries, fileSize);
 
-        ByteArrayOutputStream out = new ByteArrayOutputStream((int) submeshes.endExclusive());
+        ByteArrayOutputStream out = new ByteArrayOutputStream((int) fileSize);
         MgiWriter writer = new MgiWriter();
         writer.writeHeader(out, header);
         writer.writeChunkDirectory(out, entries);
@@ -61,6 +72,9 @@ public final class MgiStaticMeshCodec {
         out.write(vertexBytes);
         out.write(indexBytes);
         out.write(submeshBytes);
+        if (boundsBytes != null) {
+            out.write(boundsBytes);
+        }
         return out.toByteArray();
     }
 
@@ -85,6 +99,7 @@ public final class MgiStaticMeshCodec {
         MgiChunkEntry verticesEntry = required(byType, MgiChunkType.VERTEX_STREAMS);
         MgiChunkEntry indicesEntry = required(byType, MgiChunkType.INDEX_DATA);
         MgiChunkEntry submeshEntry = required(byType, MgiChunkType.SUBMESH_TABLE);
+        MgiChunkEntry boundsEntry = byType.get(MgiChunkType.BOUNDS);
 
         int[] meshTable = decodeIntPayload(bytes, meshTableEntry, MESH_TABLE_ENTRY_INTS);
         int vertexCount = meshTable[0];
@@ -103,10 +118,13 @@ public final class MgiStaticMeshCodec {
             ranges[i] = new MgiSubmeshRange(submeshInts[base], submeshInts[base + 1], submeshInts[base + 2]);
         }
 
+        MgiAabb bounds = decodeBounds(bytes, boundsEntry);
+
         MgiStaticMesh mesh = new MgiStaticMesh(
             streams.positions,
             streams.normals,
             streams.uv0,
+            bounds,
             indices,
             List.of(ranges)
         );
@@ -179,6 +197,17 @@ public final class MgiStaticMeshCodec {
             b.putInt(range.materialSlot());
             b.putInt(0);
         }
+        return b.array();
+    }
+
+    private static byte[] encodeBounds(MgiAabb bounds) {
+        ByteBuffer b = ByteBuffer.allocate(BOUNDS_FLOATS * Float.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+        b.putFloat(bounds.minX());
+        b.putFloat(bounds.minY());
+        b.putFloat(bounds.minZ());
+        b.putFloat(bounds.maxX());
+        b.putFloat(bounds.maxY());
+        b.putFloat(bounds.maxZ());
         return b.array();
     }
 
@@ -278,6 +307,25 @@ public final class MgiStaticMeshCodec {
             out[i] = b.getInt();
         }
         return out;
+    }
+
+    private static MgiAabb decodeBounds(byte[] bytes, MgiChunkEntry entry) {
+        if (entry == null) {
+            return null;
+        }
+        if (entry.lengthBytes() != (long) BOUNDS_FLOATS * Float.BYTES) {
+            throw new MgiValidationException("invalid bounds payload size");
+        }
+        ByteBuffer b = ByteBuffer.wrap(bytes, Math.toIntExact(entry.offsetBytes()), Math.toIntExact(entry.lengthBytes()))
+            .order(ByteOrder.LITTLE_ENDIAN);
+        return new MgiAabb(
+            b.getFloat(),
+            b.getFloat(),
+            b.getFloat(),
+            b.getFloat(),
+            b.getFloat(),
+            b.getFloat()
+        );
     }
 
     private static MgiChunkEntry required(Map<MgiChunkType, MgiChunkEntry> map, MgiChunkType type) {
