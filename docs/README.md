@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-03-08
+Last updated: 2026-03-09
 
 ## Core
 
@@ -33,6 +33,10 @@ Last updated: 2026-03-08
 - `docs/meshforge-mgi-v1-design.md` - canonical MeshForge Geometry Ingest (MGI) v1 format design
 - `docs/meshforge-mgi-performance-results.md` - measured OBJ vs MGI vs runtime-only activation results and conclusions
 - `docs/meshforge-meshlets-v1-plan.md` - meshlets v1 prototype goals, non-goals, and benchmark plan
+- `docs/meshforge-mgi-fastpath-plan.md` - trusted runtime fast path design and phased rollout
+- `docs/meshforge-mgi-meshlet-extension-plan.md` - meshlet extension architecture and chunk model
+- `docs/meshforge-mgi-meshlet-benchmark-results.md` - runtime generation vs prebaked meshlet load results
+- `docs/meshforge-capability-priority.md` - geometry subsystem capability priority roadmap
 
 - `docs/roadmap.md` - active and next priorities
 - `docs/plan-v1.md` - historical v1 completion snapshot
