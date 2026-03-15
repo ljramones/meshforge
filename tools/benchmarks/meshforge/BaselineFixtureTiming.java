@@ -5,6 +5,9 @@ import org.dynamisengine.meshforge.api.Pipelines;
 import org.dynamisengine.meshforge.core.mesh.MeshData;
 import org.dynamisengine.meshforge.loader.MeshLoaders;
 import org.dynamisengine.meshforge.pack.packer.MeshPacker;
+import org.dynamisengine.meshforge.pack.packer.RuntimeMeshPacker;
+import org.dynamisengine.meshforge.pack.packer.RuntimePackPlan;
+import org.dynamisengine.meshforge.pack.packer.RuntimePackWorkspace;
 import org.dynamisengine.meshforge.pack.spec.PackSpec;
 
 import java.io.IOException;
@@ -120,15 +123,15 @@ public final class BaselineFixtureTiming {
         int triangles = 0;
 
         for (int pass = 0; pass < PASSES; pass++) {
-            MeshPacker.RuntimePackWorkspace warmupWorkspace = new MeshPacker.RuntimePackWorkspace();
+            RuntimePackWorkspace warmupWorkspace = new RuntimePackWorkspace();
             for (int i = 0; i < WARMUP; i++) {
                 loaders.load(file);
                 var mesh = loaders.load(file);
                 MeshData processed = Pipelines.realtimeFast(mesh);
                 MeshPacker.pack(processed, spec);
-                MeshPacker.packInto(processed, spec, warmupWorkspace);
-                MeshPacker.RuntimePackPlan plan = MeshPacker.buildRuntimePlan(processed, spec);
-                MeshPacker.packPlannedInto(plan, warmupWorkspace);
+                RuntimeMeshPacker.packInto(processed, spec, warmupWorkspace);
+                RuntimePackPlan plan = RuntimeMeshPacker.buildRuntimePlan(processed, spec);
+                RuntimeMeshPacker.packPlannedInto(plan, warmupWorkspace);
             }
 
             double loadNsTotal = 0.0;
@@ -146,8 +149,8 @@ public final class BaselineFixtureTiming {
             double repeatedRuntimeNsPerOpTotal = 0.0;
             double repeatedPlannedNsPerOpTotal = 0.0;
 
-            MeshPacker.RuntimePackWorkspace runtimeWorkspace = new MeshPacker.RuntimePackWorkspace();
-            MeshPacker.RuntimePackWorkspace plannedWorkspace = new MeshPacker.RuntimePackWorkspace();
+            RuntimePackWorkspace runtimeWorkspace = new RuntimePackWorkspace();
+            RuntimePackWorkspace plannedWorkspace = new RuntimePackWorkspace();
             for (int i = 0; i < ROUNDS; i++) {
                 MeshData coldFriendlyMesh = loaders.load(file);
                 long coldFriendlyStart = System.nanoTime();
@@ -159,15 +162,15 @@ public final class BaselineFixtureTiming {
                 MeshData coldRuntimeMesh = loaders.load(file);
                 long coldRuntimeStart = System.nanoTime();
                 MeshData coldRuntimeProcessed = Pipelines.realtimeFast(coldRuntimeMesh);
-                MeshPacker.packInto(coldRuntimeProcessed, spec, runtimeWorkspace);
+                RuntimeMeshPacker.packInto(coldRuntimeProcessed, spec, runtimeWorkspace);
                 long coldRuntimeEnd = System.nanoTime();
                 coldRuntimeNsTotal += (coldRuntimeEnd - coldRuntimeStart);
 
                 MeshData coldPlannedMesh = loaders.load(file);
                 long coldPlannedStart = System.nanoTime();
                 MeshData coldPlannedProcessed = Pipelines.realtimeFast(coldPlannedMesh);
-                MeshPacker.RuntimePackPlan coldPlan = MeshPacker.buildRuntimePlan(coldPlannedProcessed, spec);
-                MeshPacker.packPlannedInto(coldPlan, plannedWorkspace);
+                RuntimePackPlan coldPlan = RuntimeMeshPacker.buildRuntimePlan(coldPlannedProcessed, spec);
+                RuntimeMeshPacker.packPlannedInto(coldPlan, plannedWorkspace);
                 long coldPlannedEnd = System.nanoTime();
                 coldPlannedNsTotal += (coldPlannedEnd - coldPlannedStart);
 
@@ -177,7 +180,7 @@ public final class BaselineFixtureTiming {
 
                 MeshData loadedOnce = loaders.load(file);
                 MeshData preparedOnce = Pipelines.realtimeFast(loadedOnce);
-                MeshPacker.RuntimePackPlan repeatedPlan = MeshPacker.buildRuntimePlan(preparedOnce, spec);
+                RuntimePackPlan repeatedPlan = RuntimeMeshPacker.buildRuntimePlan(preparedOnce, spec);
 
                 long repeatedFriendlyStart = System.nanoTime();
                 for (int it = 0; it < repeatCreate; it++) {
@@ -188,14 +191,14 @@ public final class BaselineFixtureTiming {
 
                 long repeatedRuntimeStart = System.nanoTime();
                 for (int it = 0; it < repeatCreate; it++) {
-                    MeshPacker.packInto(preparedOnce, spec, runtimeWorkspace);
+                    RuntimeMeshPacker.packInto(preparedOnce, spec, runtimeWorkspace);
                 }
                 long repeatedRuntimeEnd = System.nanoTime();
                 repeatedRuntimeNsPerOpTotal += ((double) (repeatedRuntimeEnd - repeatedRuntimeStart)) / repeatCreate;
 
                 long repeatedPlannedStart = System.nanoTime();
                 for (int it = 0; it < repeatCreate; it++) {
-                    MeshPacker.packPlannedInto(repeatedPlan, plannedWorkspace);
+                    RuntimeMeshPacker.packPlannedInto(repeatedPlan, plannedWorkspace);
                 }
                 long repeatedPlannedEnd = System.nanoTime();
                 repeatedPlannedNsPerOpTotal += ((double) (repeatedPlannedEnd - repeatedPlannedStart)) / repeatCreate;

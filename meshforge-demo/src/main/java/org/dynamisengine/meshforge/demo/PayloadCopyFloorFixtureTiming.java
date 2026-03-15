@@ -9,6 +9,9 @@ import org.dynamisengine.meshforge.gpu.RuntimeGeometryPayload;
 import org.dynamisengine.meshforge.loader.MeshLoaders;
 import org.dynamisengine.meshforge.mgi.MgiMeshDataCodec;
 import org.dynamisengine.meshforge.pack.packer.MeshPacker;
+import org.dynamisengine.meshforge.pack.packer.RuntimeMeshPacker;
+import org.dynamisengine.meshforge.pack.packer.RuntimePackPlan;
+import org.dynamisengine.meshforge.pack.packer.RuntimePackWorkspace;
 import org.dynamisengine.meshforge.pack.spec.PackSpec;
 
 import java.nio.ByteBuffer;
@@ -109,9 +112,9 @@ public final class PayloadCopyFloorFixtureTiming {
         MgiMeshDataCodec.RuntimeDecodeResult decoded = codec.readForRuntime(Files.readAllBytes(trustedSidecar));
 
         MeshData mesh = decoded.meshData();
-        MeshPacker.RuntimePackPlan plan = MeshPacker.buildRuntimePlan(mesh, spec);
-        MeshPacker.RuntimePackWorkspace workspace = new MeshPacker.RuntimePackWorkspace();
-        MeshPacker.packPlannedInto(plan, workspace);
+        RuntimePackPlan plan = RuntimeMeshPacker.buildRuntimePlan(mesh, spec);
+        RuntimePackWorkspace workspace = new RuntimePackWorkspace();
+        RuntimeMeshPacker.packPlannedInto(plan, workspace);
 
         RuntimeGeometryPayload payload = MeshForgeGpuBridge.payloadFromRuntimeWorkspace(plan.layout(), workspace);
         GpuGeometryUploadPlan uploadPlan = MeshForgeGpuBridge.buildUploadPlan(payload);

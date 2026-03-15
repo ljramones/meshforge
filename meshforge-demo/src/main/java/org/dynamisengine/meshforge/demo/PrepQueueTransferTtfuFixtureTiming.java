@@ -13,6 +13,9 @@ import org.dynamisengine.meshforge.gpu.RuntimeGeometryPayload;
 import org.dynamisengine.meshforge.loader.MeshLoaders;
 import org.dynamisengine.meshforge.mgi.MgiMeshDataCodec;
 import org.dynamisengine.meshforge.pack.packer.MeshPacker;
+import org.dynamisengine.meshforge.pack.packer.RuntimeMeshPacker;
+import org.dynamisengine.meshforge.pack.packer.RuntimePackPlan;
+import org.dynamisengine.meshforge.pack.packer.RuntimePackWorkspace;
 import org.dynamisengine.meshforge.pack.spec.PackSpec;
 
 import java.nio.ByteBuffer;
@@ -239,12 +242,12 @@ public final class PrepQueueTransferTtfuFixtureTiming {
                 }
                 long tPipeline = System.nanoTime();
 
-                MeshPacker.RuntimePackPlan runtimePlan = MeshPacker.buildRuntimePlan(processed, spec);
+                RuntimePackPlan runtimePlan = RuntimeMeshPacker.buildRuntimePlan(processed, spec);
                 long tPlan = System.nanoTime();
 
-                MeshPacker.RuntimePackWorkspace workspace = new MeshPacker.RuntimePackWorkspace();
+                RuntimePackWorkspace workspace = new RuntimePackWorkspace();
                 MeshPacker.RuntimePackProfile packProfile = new MeshPacker.RuntimePackProfile();
-                MeshPacker.packPlannedIntoProfiled(runtimePlan, workspace, packProfile);
+                RuntimeMeshPacker.packPlannedIntoProfiled(runtimePlan, workspace, packProfile);
                 long tPack = System.nanoTime();
 
                 RuntimeGeometryPayload payload =

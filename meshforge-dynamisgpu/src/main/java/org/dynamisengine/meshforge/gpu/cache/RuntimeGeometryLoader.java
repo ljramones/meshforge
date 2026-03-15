@@ -6,6 +6,9 @@ import org.dynamisengine.meshforge.gpu.MeshForgeGpuBridge;
 import org.dynamisengine.meshforge.gpu.RuntimeGeometryPayload;
 import org.dynamisengine.meshforge.loader.MeshLoaders;
 import org.dynamisengine.meshforge.pack.packer.MeshPacker;
+import org.dynamisengine.meshforge.pack.packer.RuntimeMeshPacker;
+import org.dynamisengine.meshforge.pack.packer.RuntimePackPlan;
+import org.dynamisengine.meshforge.pack.packer.RuntimePackWorkspace;
 import org.dynamisengine.meshforge.pack.spec.PackSpec;
 
 import java.io.IOException;
@@ -92,9 +95,9 @@ public final class RuntimeGeometryLoader {
 
         MeshData loaded = loaders.load(sourceMesh);
         MeshData processed = Pipelines.realtimeFast(loaded);
-        MeshPacker.RuntimePackPlan plan = MeshPacker.buildRuntimePlan(processed, packSpec);
-        MeshPacker.RuntimePackWorkspace workspace = new MeshPacker.RuntimePackWorkspace();
-        MeshPacker.packPlannedInto(plan, workspace);
+        RuntimePackPlan plan = RuntimeMeshPacker.buildRuntimePlan(processed, packSpec);
+        RuntimePackWorkspace workspace = new RuntimePackWorkspace();
+        RuntimeMeshPacker.packPlannedInto(plan, workspace);
         RuntimeGeometryPayload payload = MeshForgeGpuBridge.payloadFromRuntimeWorkspace(plan.layout(), workspace);
         RuntimeGeometryCacheIO.write(cacheFile, payload);
         return new Prepared(payload, Source.REBUILT);

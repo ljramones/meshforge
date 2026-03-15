@@ -6,6 +6,8 @@ import org.dynamisengine.meshforge.ops.pipeline.MeshContext;
 import org.dynamisengine.meshforge.ops.pipeline.MeshOp;
 import org.dynamisengine.meshforge.ops.pipeline.MeshPipeline;
 import org.dynamisengine.meshforge.pack.packer.MeshPacker;
+import org.dynamisengine.meshforge.pack.packer.RuntimeMeshPacker;
+import org.dynamisengine.meshforge.pack.packer.RuntimePackWorkspace;
 import org.dynamisengine.meshforge.pack.spec.PackSpec;
 
 import java.util.ArrayList;
@@ -40,7 +42,7 @@ public final class Pipelines {
      * Reusable workspace for runtime planned realtime execution.
      */
     public static final class RuntimeRealtimeWorkspace {
-        private final MeshPacker.RuntimePackWorkspace packWorkspace = new MeshPacker.RuntimePackWorkspace();
+        private final RuntimePackWorkspace packWorkspace = new RuntimePackWorkspace();
     }
 
     /**
@@ -365,7 +367,7 @@ public final class Pipelines {
             throw new NullPointerException("workspace");
         }
         MeshData processed = runPlan(mesh, plan.ops);
-        MeshPacker.packInto(processed, plan.packSpec, workspace.packWorkspace);
+        RuntimeMeshPacker.packInto(processed, plan.packSpec, workspace.packWorkspace);
     }
 
     private static MeshData runPlan(MeshData mesh, MeshOp[] ops) {

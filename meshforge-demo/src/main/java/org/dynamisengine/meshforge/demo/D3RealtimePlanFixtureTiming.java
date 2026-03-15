@@ -5,6 +5,8 @@ import org.dynamisengine.meshforge.api.Pipelines;
 import org.dynamisengine.meshforge.core.mesh.MeshData;
 import org.dynamisengine.meshforge.loader.MeshLoaders;
 import org.dynamisengine.meshforge.pack.packer.MeshPacker;
+import org.dynamisengine.meshforge.pack.packer.RuntimeMeshPacker;
+import org.dynamisengine.meshforge.pack.packer.RuntimePackWorkspace;
 import org.dynamisengine.meshforge.pack.spec.PackSpec;
 
 import java.nio.file.Files;
@@ -89,12 +91,12 @@ public final class D3RealtimePlanFixtureTiming {
         int triangles = 0;
 
         for (int pass = 0; pass < 3; pass++) {
-            MeshPacker.RuntimePackWorkspace warmRuntimeWs = new MeshPacker.RuntimePackWorkspace();
+            RuntimePackWorkspace warmRuntimeWs = new RuntimePackWorkspace();
             Pipelines.RuntimeRealtimeWorkspace warmPlanWs = new Pipelines.RuntimeRealtimeWorkspace();
             for (int i = 0; i < WARMUP; i++) {
                 MeshData warmMesh = loaders.load(fixture);
                 MeshData warmRuntimeProcessed = Pipelines.realtimeFast(warmMesh);
-                MeshPacker.packInto(warmRuntimeProcessed, spec, warmRuntimeWs);
+                RuntimeMeshPacker.packInto(warmRuntimeProcessed, spec, warmRuntimeWs);
 
                 MeshData warmPlanMesh = loaders.load(fixture);
                 Pipelines.RuntimeRealtimePlan warmPlan = Pipelines.buildRealtimeFastPlan(warmPlanMesh, spec);
@@ -113,11 +115,11 @@ public final class D3RealtimePlanFixtureTiming {
             Pipelines.RuntimeRealtimeWorkspace reuseWorkspace = new Pipelines.RuntimeRealtimeWorkspace();
 
             for (int i = 0; i < ROUNDS; i++) {
-                MeshPacker.RuntimePackWorkspace runtimeWs = new MeshPacker.RuntimePackWorkspace();
+                RuntimePackWorkspace runtimeWs = new RuntimePackWorkspace();
                 MeshData runtimeMesh = loaders.load(fixture);
                 long runtimeStart = System.nanoTime();
                 MeshData runtimeProcessed = Pipelines.realtimeFast(runtimeMesh);
-                MeshPacker.packInto(runtimeProcessed, spec, runtimeWs);
+                RuntimeMeshPacker.packInto(runtimeProcessed, spec, runtimeWs);
                 runtimeColdNs += (System.nanoTime() - runtimeStart);
                 if (triangles == 0) {
                     int[] idx = runtimeProcessed.indicesOrNull();
@@ -162,13 +164,13 @@ public final class D3RealtimePlanFixtureTiming {
     }
 
     private static double repeatLaneRuntime(MeshLoaders loaders, Path fixture, PackSpec spec, int repeat) throws Exception {
-        MeshPacker.RuntimePackWorkspace ws = new MeshPacker.RuntimePackWorkspace();
+        RuntimePackWorkspace ws = new RuntimePackWorkspace();
         long totalNs = 0L;
         for (int it = 0; it < repeat; it++) {
             MeshData mesh = loaders.load(fixture);
             long start = System.nanoTime();
             MeshData processed = Pipelines.realtimeFast(mesh);
-            MeshPacker.packInto(processed, spec, ws);
+            RuntimeMeshPacker.packInto(processed, spec, ws);
             totalNs += (System.nanoTime() - start);
         }
         return ((double) totalNs) / repeat;

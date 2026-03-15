@@ -9,6 +9,9 @@ import org.dynamisengine.meshforge.loader.MeshLoaders;
 import org.dynamisengine.meshforge.ops.pipeline.MeshContext;
 import org.dynamisengine.meshforge.ops.pipeline.MeshOp;
 import org.dynamisengine.meshforge.pack.packer.MeshPacker;
+import org.dynamisengine.meshforge.pack.packer.RuntimeMeshPacker;
+import org.dynamisengine.meshforge.pack.packer.RuntimePackPlan;
+import org.dynamisengine.meshforge.pack.packer.RuntimePackWorkspace;
 import org.dynamisengine.meshforge.pack.spec.PackSpec;
 
 import java.io.IOException;
@@ -120,18 +123,18 @@ public final class RealtimePipelineHotspotTiming {
                 pipelineNsTotal += opElapsed;
             }
 
-            MeshPacker.RuntimePackWorkspace runtimeWs = new MeshPacker.RuntimePackWorkspace();
+            RuntimePackWorkspace runtimeWs = new RuntimePackWorkspace();
             long packStart = System.nanoTime();
-            MeshPacker.packInto(current, spec, runtimeWs);
+            RuntimeMeshPacker.packInto(current, spec, runtimeWs);
             long packElapsed = System.nanoTime() - packStart;
 
-            MeshPacker.RuntimePackWorkspace plannedWs = new MeshPacker.RuntimePackWorkspace();
+            RuntimePackWorkspace plannedWs = new RuntimePackWorkspace();
             long planBuildStart = System.nanoTime();
-            MeshPacker.RuntimePackPlan plan = MeshPacker.buildRuntimePlan(current, spec);
+            RuntimePackPlan plan = RuntimeMeshPacker.buildRuntimePlan(current, spec);
             long planBuildElapsed = System.nanoTime() - planBuildStart;
 
             long packPlannedStart = System.nanoTime();
-            MeshPacker.packPlannedInto(plan, plannedWs);
+            RuntimeMeshPacker.packPlannedInto(plan, plannedWs);
             long packPlannedElapsed = System.nanoTime() - packPlannedStart;
 
             long totalElapsed = setupElapsed + pipelineNsTotal + packElapsed;

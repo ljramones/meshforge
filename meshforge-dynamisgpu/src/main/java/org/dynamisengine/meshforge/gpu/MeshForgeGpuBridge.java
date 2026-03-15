@@ -2,7 +2,7 @@ package org.dynamisengine.meshforge.gpu;
 
 import org.dynamisengine.meshforge.pack.buffer.PackedMesh;
 import org.dynamisengine.meshforge.pack.layout.VertexLayout;
-import org.dynamisengine.meshforge.pack.packer.MeshPacker;
+import org.dynamisengine.meshforge.pack.packer.RuntimePackWorkspace;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -51,7 +51,7 @@ public final class MeshForgeGpuBridge {
      */
     public static RuntimeGeometryPayload payloadFromRuntimeWorkspace(
         VertexLayout layout,
-        MeshPacker.RuntimePackWorkspace workspace
+        RuntimePackWorkspace workspace
     ) {
         if (layout == null) {
             throw new NullPointerException("layout");

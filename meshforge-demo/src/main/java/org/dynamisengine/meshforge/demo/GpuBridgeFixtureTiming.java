@@ -8,6 +8,9 @@ import org.dynamisengine.meshforge.gpu.MeshForgeGpuBridge;
 import org.dynamisengine.meshforge.gpu.RuntimeGeometryPayload;
 import org.dynamisengine.meshforge.loader.MeshLoaders;
 import org.dynamisengine.meshforge.pack.packer.MeshPacker;
+import org.dynamisengine.meshforge.pack.packer.RuntimeMeshPacker;
+import org.dynamisengine.meshforge.pack.packer.RuntimePackPlan;
+import org.dynamisengine.meshforge.pack.packer.RuntimePackWorkspace;
 import org.dynamisengine.meshforge.pack.spec.PackSpec;
 
 import java.nio.file.Files;
@@ -78,9 +81,9 @@ public final class GpuBridgeFixtureTiming {
             for (int i = 0; i < WARMUP; i++) {
                 MeshData warm = loaders.load(fixture);
                 MeshData processed = Pipelines.realtimeFast(warm);
-                MeshPacker.RuntimePackPlan p = MeshPacker.buildRuntimePlan(processed, spec);
-                MeshPacker.RuntimePackWorkspace ws = new MeshPacker.RuntimePackWorkspace();
-                MeshPacker.packPlannedInto(p, ws);
+                RuntimePackPlan p = RuntimeMeshPacker.buildRuntimePlan(processed, spec);
+                RuntimePackWorkspace ws = new RuntimePackWorkspace();
+                RuntimeMeshPacker.packPlannedInto(p, ws);
                 RuntimeGeometryPayload payload = MeshForgeGpuBridge.payloadFromRuntimeWorkspace(p.layout(), ws);
                 MeshForgeGpuBridge.buildUploadPlan(payload);
             }
@@ -98,10 +101,10 @@ public final class GpuBridgeFixtureTiming {
                 }
 
                 long t0 = System.nanoTime();
-                MeshPacker.RuntimePackPlan plan = MeshPacker.buildRuntimePlan(processed, spec);
+                RuntimePackPlan plan = RuntimeMeshPacker.buildRuntimePlan(processed, spec);
                 long t1 = System.nanoTime();
-                MeshPacker.RuntimePackWorkspace workspace = new MeshPacker.RuntimePackWorkspace();
-                MeshPacker.packPlannedInto(plan, workspace);
+                RuntimePackWorkspace workspace = new RuntimePackWorkspace();
+                RuntimeMeshPacker.packPlannedInto(plan, workspace);
                 long t2 = System.nanoTime();
                 RuntimeGeometryPayload payload = MeshForgeGpuBridge.payloadFromRuntimeWorkspace(plan.layout(), workspace);
                 GpuGeometryUploadPlan gpuPlan = MeshForgeGpuBridge.buildUploadPlan(payload);

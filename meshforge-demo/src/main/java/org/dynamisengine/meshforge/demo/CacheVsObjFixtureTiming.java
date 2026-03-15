@@ -10,6 +10,9 @@ import org.dynamisengine.meshforge.gpu.cache.RuntimeGeometryCachePolicy;
 import org.dynamisengine.meshforge.gpu.cache.RuntimeGeometryLoader;
 import org.dynamisengine.meshforge.loader.MeshLoaders;
 import org.dynamisengine.meshforge.pack.packer.MeshPacker;
+import org.dynamisengine.meshforge.pack.packer.RuntimeMeshPacker;
+import org.dynamisengine.meshforge.pack.packer.RuntimePackPlan;
+import org.dynamisengine.meshforge.pack.packer.RuntimePackWorkspace;
 import org.dynamisengine.meshforge.pack.spec.PackSpec;
 
 import java.nio.file.Files;
@@ -104,9 +107,9 @@ public final class CacheVsObjFixtureTiming {
             for (int i = 0; i < WARMUP; i++) {
                 MeshData warm = loaders.load(fixture);
                 MeshData warmProcessed = Pipelines.realtimeFast(warm);
-                MeshPacker.RuntimePackPlan warmPlan = MeshPacker.buildRuntimePlan(warmProcessed, spec);
-                MeshPacker.RuntimePackWorkspace warmWs = new MeshPacker.RuntimePackWorkspace();
-                MeshPacker.packPlannedInto(warmPlan, warmWs);
+                RuntimePackPlan warmPlan = RuntimeMeshPacker.buildRuntimePlan(warmProcessed, spec);
+                RuntimePackWorkspace warmWs = new RuntimePackWorkspace();
+                RuntimeMeshPacker.packPlannedInto(warmPlan, warmWs);
                 RuntimeGeometryPayload warmPayload = MeshForgeGpuBridge.payloadFromRuntimeWorkspace(warmPlan.layout(), warmWs);
                 MeshForgeGpuBridge.buildUploadPlan(warmPayload);
                 RuntimeGeometryPayload warmCachePayload =
@@ -120,9 +123,9 @@ public final class CacheVsObjFixtureTiming {
                 long objStart = System.nanoTime();
                 MeshData loaded = loaders.load(fixture);
                 MeshData objProcessed = Pipelines.realtimeFast(loaded);
-                MeshPacker.RuntimePackPlan objPlan = MeshPacker.buildRuntimePlan(objProcessed, spec);
-                MeshPacker.RuntimePackWorkspace objWs = new MeshPacker.RuntimePackWorkspace();
-                MeshPacker.packPlannedInto(objPlan, objWs);
+                RuntimePackPlan objPlan = RuntimeMeshPacker.buildRuntimePlan(objProcessed, spec);
+                RuntimePackWorkspace objWs = new RuntimePackWorkspace();
+                RuntimeMeshPacker.packPlannedInto(objPlan, objWs);
                 RuntimeGeometryPayload objPayload = MeshForgeGpuBridge.payloadFromRuntimeWorkspace(objPlan.layout(), objWs);
                 GpuGeometryUploadPlan objGpuPlan = MeshForgeGpuBridge.buildUploadPlan(objPayload);
                 if (objGpuPlan.vertexBinding().byteSize() <= 0) {

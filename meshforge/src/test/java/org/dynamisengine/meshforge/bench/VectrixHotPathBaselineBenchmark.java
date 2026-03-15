@@ -7,6 +7,10 @@ import org.dynamisengine.meshforge.ops.pipeline.MeshContext;
 import org.dynamisengine.meshforge.ops.pipeline.MeshPipeline;
 import org.dynamisengine.meshforge.pack.buffer.PackedMesh;
 import org.dynamisengine.meshforge.pack.packer.MeshPacker;
+import org.dynamisengine.meshforge.pack.packer.RuntimeMeshPacker;
+import org.dynamisengine.meshforge.pack.packer.RuntimePackPlan;
+import org.dynamisengine.meshforge.pack.packer.RuntimePackWorkspace;
+import org.dynamisengine.meshforge.pack.packer.MeshPacker.RuntimePackWorkspacePool;
 import org.dynamisengine.meshforge.pack.simd.SimdNormalPacker;
 import org.dynamisengine.meshforge.pack.spec.PackSpec;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -68,15 +72,15 @@ public class VectrixHotPathBaselineBenchmark {
 
     @State(Scope.Benchmark)
     public static class PackState extends BaseMeshState {
-        MeshPacker.RuntimePackWorkspace packWorkspace;
-        MeshPacker.RuntimePackWorkspacePool packWorkspacePool;
-        MeshPacker.RuntimePackPlan runtimePlan;
+        RuntimePackWorkspace packWorkspace;
+        RuntimePackWorkspacePool packWorkspacePool;
+        RuntimePackPlan runtimePlan;
 
         @Setup(Level.Trial)
         public void setupPackTrial() {
-            packWorkspace = new MeshPacker.RuntimePackWorkspace();
-            packWorkspacePool = new MeshPacker.RuntimePackWorkspacePool(8);
-            runtimePlan = MeshPacker.buildRuntimePlan(template, PackSpec.realtime());
+            packWorkspace = new RuntimePackWorkspace();
+            packWorkspacePool = new RuntimePackWorkspacePool(8);
+            runtimePlan = RuntimeMeshPacker.buildRuntimePlan(template, PackSpec.realtime());
         }
     }
 
@@ -141,22 +145,22 @@ public class VectrixHotPathBaselineBenchmark {
 
     @Benchmark
     public void meshPackerRealtimeRuntime(PackState state, Blackhole bh) {
-        MeshPacker.packInto(state.template, PackSpec.realtime(), state.packWorkspace);
+        RuntimeMeshPacker.packInto(state.template, PackSpec.realtime(), state.packWorkspace);
         bh.consume(state.packWorkspace.vertexBytes());
         bh.consume(state.packWorkspace.indexBytes());
     }
 
     @Benchmark
     public void meshPackerRealtimeRuntimeVertexOnly(PackState state, Blackhole bh) {
-        MeshPacker.packVertexPayloadInto(state.template, PackSpec.realtime(), state.packWorkspace);
+        RuntimeMeshPacker.packVertexPayloadInto(state.template, PackSpec.realtime(), state.packWorkspace);
         bh.consume(state.packWorkspace.vertexBytes());
     }
 
     @Benchmark
     public void meshPackerRealtimeRuntimePooled(PackState state, Blackhole bh) {
-        MeshPacker.RuntimePackWorkspace workspace = state.packWorkspacePool.acquire();
+        RuntimePackWorkspace workspace = state.packWorkspacePool.acquire();
         try {
-            MeshPacker.packInto(state.template, PackSpec.realtime(), workspace);
+            RuntimeMeshPacker.packInto(state.template, PackSpec.realtime(), workspace);
             bh.consume(workspace.vertexBytes());
             bh.consume(workspace.indexBytes());
         } finally {
@@ -166,7 +170,7 @@ public class VectrixHotPathBaselineBenchmark {
 
     @Benchmark
     public void meshPackerRealtimeRuntimePlanned(PackState state, Blackhole bh) {
-        MeshPacker.packPlannedInto(state.runtimePlan, state.packWorkspace);
+        RuntimeMeshPacker.packPlannedInto(state.runtimePlan, state.packWorkspace);
         bh.consume(state.packWorkspace.vertexBytes());
         bh.consume(state.packWorkspace.indexBytes());
     }
@@ -212,7 +216,7 @@ public class VectrixHotPathBaselineBenchmark {
     @OperationsPerInvocation(BATCH_SIZE)
     public void meshPackerRealtimeRuntimeBatch(PackState state, Blackhole bh) {
         for (int i = 0; i < BATCH_SIZE; i++) {
-            MeshPacker.packInto(state.template, PackSpec.realtime(), state.packWorkspace);
+            RuntimeMeshPacker.packInto(state.template, PackSpec.realtime(), state.packWorkspace);
             bh.consume(state.packWorkspace.vertexBytes());
         }
     }
@@ -221,7 +225,7 @@ public class VectrixHotPathBaselineBenchmark {
     @OperationsPerInvocation(BATCH_SIZE)
     public void meshPackerRealtimeRuntimeVertexOnlyBatch(PackState state, Blackhole bh) {
         for (int i = 0; i < BATCH_SIZE; i++) {
-            MeshPacker.packVertexPayloadInto(state.template, PackSpec.realtime(), state.packWorkspace);
+            RuntimeMeshPacker.packVertexPayloadInto(state.template, PackSpec.realtime(), state.packWorkspace);
             bh.consume(state.packWorkspace.vertexBytes());
         }
     }
@@ -230,9 +234,9 @@ public class VectrixHotPathBaselineBenchmark {
     @OperationsPerInvocation(BATCH_SIZE)
     public void meshPackerRealtimeRuntimePooledBatch(PackState state, Blackhole bh) {
         for (int i = 0; i < BATCH_SIZE; i++) {
-            MeshPacker.RuntimePackWorkspace workspace = state.packWorkspacePool.acquire();
+            RuntimePackWorkspace workspace = state.packWorkspacePool.acquire();
             try {
-                MeshPacker.packInto(state.template, PackSpec.realtime(), workspace);
+                RuntimeMeshPacker.packInto(state.template, PackSpec.realtime(), workspace);
                 bh.consume(workspace.vertexBytes());
             } finally {
                 state.packWorkspacePool.release(workspace);
@@ -244,7 +248,7 @@ public class VectrixHotPathBaselineBenchmark {
     @OperationsPerInvocation(BATCH_SIZE)
     public void meshPackerRealtimeRuntimePlannedBatch(PackState state, Blackhole bh) {
         for (int i = 0; i < BATCH_SIZE; i++) {
-            MeshPacker.packPlannedInto(state.runtimePlan, state.packWorkspace);
+            RuntimeMeshPacker.packPlannedInto(state.runtimePlan, state.packWorkspace);
             bh.consume(state.packWorkspace.vertexBytes());
         }
     }
